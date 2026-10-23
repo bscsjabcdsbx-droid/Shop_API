@@ -1,6 +1,6 @@
 /* api.js — nối giao diện với shop-api. Nếu không gọi được API, trang tự chạy chế độ demo (localStorage). */
 (function(){
-const API=window.MONO_API||(location.protocol.startsWith('http')&&location.port==='4000'?'/api':'http://localhost:4000/api');
+const API = window.MONO_API || 'https://shop-api-1-gvf9.onrender.com/api';
 const ENUM=['PENDING','CONFIRMED','PREPARING','SHIPPING','DELIVERED','CANCELLED'],CATIDS={},SZ=['S','M','L','XL','FREE'];
 let TOKEN='';try{TOKEN=localStorage.getItem('mono-token')||''}catch(e){}
 const setTok=t=>{TOKEN=t;try{t?localStorage.setItem('mono-token',t):localStorage.removeItem('mono-token')}catch(e){}};
