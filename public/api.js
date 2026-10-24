@@ -1,6 +1,7 @@
 /* api.js — nối giao diện với shop-api. Nếu không gọi được API, trang tự chạy chế độ demo (localStorage). */
 (function(){
-const API = window.MONO_API || 'https://shop-api-1-gvf9.onrender.com/api';
+const API=window.MONO_API||(location.protocol.startsWith('http')&&location.port==='4000'?'/api':'http://localhost:4000/api');
+const ORIGIN=API.replace(/\/api$/,'');
 const ENUM=['PENDING','CONFIRMED','PREPARING','SHIPPING','DELIVERED','CANCELLED'],CATIDS={},SZ=['S','M','L','XL','FREE'];
 let TOKEN='';try{TOKEN=localStorage.getItem('mono-token')||''}catch(e){}
 const setTok=t=>{TOKEN=t;try{t?localStorage.setItem('mono-token',t):localStorage.removeItem('mono-token')}catch(e){}};
@@ -14,7 +15,7 @@ async function rq(path,o={}){
 
 const mapP=s=>{const vs=s.variants||[],stock={},vid={};vs.forEach(v=>{stock[v.size+'|'+v.color]=v.stock;vid[v.size+'|'+v.color]=v.id});
  const sizes=[...new Set(vs.map(v=>v.size))].sort((a,b)=>SZ.indexOf(a)-SZ.indexOf(b)),colors=Object.keys(COLS).filter(c=>vs.some(v=>v.color===c));
- return{id:s.id,slug:s.slug,name:s.name,cat:s.category.slug,price:s.price,sale:s.salePrice||0,sold:s.soldCount,mat:s.material||'',desc:s.description,sizes,colors,stock,vid,date:Date.parse(s.createdAt),rating:s.rating||0,images:(s.images||[]).map(i=>i.url)}};
+ return{id:s.id,slug:s.slug,name:s.name,cat:s.category.slug,price:s.price,sale:s.salePrice||0,sold:s.soldCount,mat:s.material||'',desc:s.description,sizes,colors,stock,vid,date:Date.parse(s.createdAt),rating:s.rating||0,images:(s.images||[]).map(i=>i.url.startsWith('/')?ORIGIN+i.url:i.url)}};
 const mapO=o=>({id:o.code,rid:o.id,uid:o.userId,date:Date.parse(o.createdAt),status:ENUM.indexOf(o.status),name:o.shipName,phone:o.shipPhone,email:o.shipEmail,addr:o.shipAddress,note:o.note||'',pay:o.paymentMethod,ship:o.shippingFee,sub:o.subtotal,total:o.total,items:o.items.map(i=>({pid:0,name:i.name,size:i.size,color:i.color,price:i.price,qty:i.quantity}))});
 
 async function loadProducts(){const d=await rq('/products?limit=48');db.products=d.items.map(mapP);d.items.forEach(p=>{db.reviews[p.id]=Array.from({length:p.reviewCount},()=>({r:p.rating,u:'',c:''}))})}
@@ -37,7 +38,7 @@ async function afterAuth(res){
 function install(){
  save=()=>{try{localStorage.setItem('mono-wish',JSON.stringify(db.wish))}catch(e){}};
  rate=p=>p.rating||0;
- const svg0=img;img=(p,i=0)=>p.images&&p.images.length?p.images[i%p.images.length]:svg0(p,i);
+ 
  const go0=go;go=function(v,a=null){go0(v,a);
   if(v==='detail')loadDetail(a);
   else if(v==='orders'&&db.session)loadMyOrders().then(()=>{if(S.view==='orders')render()}).catch(e=>toast(e.message));
@@ -77,8 +78,11 @@ function install(){
  A.psv=async p=>{const g=i=>$('#'+i).value.trim(),er=$('#merr'),price=+g('m_p'),sale=+g('m_s')||0,sizes=g('m_z').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean),colors=g('m_l').split(',').map(s=>s.trim()).filter(c=>COLS[c]);
   if(g('m_n').length<2)return er.textContent='Vui lòng nhập tên sản phẩm';if(!(price>0))return er.textContent='Giá phải lớn hơn 0';if(sale&&sale>=price)return er.textContent='Giá khuyến mãi phải thấp hơn giá gốc';if(!sizes.length||!colors.length)return er.textContent='Cần ít nhất 1 size và 1 màu hợp lệ (Đen, Trắng, Xám)';
   const old=+p?P(p):null,sl=slug(g('m_n')),variants=sizes.flatMap(s=>colors.map(c=>({size:s,color:c,stock:old&&old.stock[s+'|'+c]!=null?old.stock[s+'|'+c]:Math.max(0,+g('m_k')||0)})));
-  const body={name:g('m_n'),slug:sl,description:g('m_d')||g('m_n'),material:old?old.mat:'Cotton 100%',price,salePrice:sale||null,categoryId:CATIDS[g('m_c')],isActive:true,images:old&&old.images.length?old.images:[0,1,2].map(i=>`https://picsum.photos/seed/${sl}-${i}/800/1000`),variants};
+  const body={name:g('m_n'),slug:sl,description:g('m_d')||g('m_n'),material:old?old.mat:'Cotton 100%',price,salePrice:sale||null,categoryId:CATIDS[g('m_c')],isActive:true,images:(S.pimgs||[]).map(u=>ORIGIN&&u.startsWith(ORIGIN+'/')?u.slice(ORIGIN.length):u),variants};
   try{await rq(old?'/admin/products/'+old.id:'/admin/products',{method:old?'PUT':'POST',body});modal('');await loadProducts();render();toast('Đã lưu sản phẩm')}catch(e){er.textContent=e.message}};
+ storeImage=async d=>ORIGIN+(await rq('/admin/upload',{method:'POST',body:{dataUrl:d}})).url;
+ A.complete=async p=>{const o=db.orders.find(x=>x.id===p);if(!o||o.status>=4)return;if(!confirm('Đánh dấu đơn '+p+' đã hoàn thành? Doanh thu sẽ được cập nhật.'))return;
+  try{await rq('/admin/orders/'+o.rid+'/complete',{method:'POST'});o.status=4;o.doneAt=Date.now();render();toast('Đã hoàn thành đơn '+p+', doanh thu +'+vnd(o.total))}catch(e){toast(e.message)}};
  dash=function(){const s=S.stats;if(!s)return'<div class="empty">Đang tải…</div>';const ms=s.monthly.slice(-6),mx=Math.max(1,...ms.map(m=>m.revenue));
   return`<div class="stats">${[['Doanh thu',vnd(s.revenue)],['Đơn hàng',s.orders],['Khách hàng',s.customers],['Sản phẩm',s.products]].map(x=>`<div class="box"><span class="mut">${x[0]}</span><b>${x[1]}</b></div>`).join('')}</div>
  <div class="two" style="margin-top:20px"><div class="box"><h3>Doanh thu theo tháng</h3>${ms.length?`<div class="bars">${ms.map(m=>`<div><i style="height:${Math.round(m.revenue/mx*110)}px"></i>${m.month.slice(5)}/${m.month.slice(2,4)}</div>`).join('')}</div>`:'<p class="mut">Chưa có dữ liệu.</p>'}</div><div class="box"><h3>Sản phẩm bán chạy</h3>${s.topProducts.map(p=>`<p class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)}</span><b>${p.soldCount}</b></p>`).join('')}</div></div>
