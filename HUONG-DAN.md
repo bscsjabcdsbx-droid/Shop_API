@@ -86,3 +86,10 @@ curl http://localhost:4000/api/products?category=ao&sort=price_asc
 - Chạy sau HTTPS (Nginx, Caddy hoặc dịch vụ hosting).
 - Dùng PostgreSQL có sao lưu định kỳ.
 - Đặt `CLIENT_ORIGIN` đúng tên miền nếu giao diện chạy ở domain khác với API.
+
+## 8. Cập nhật: ảnh sản phẩm, hoàn thành đơn, doanh thu
+- Sau khi cập nhật code, chạy lại `npm run db:push` để thêm cột `deliveredAt` vào bảng Order. Dữ liệu cũ được giữ nguyên.
+- **Doanh thu chỉ tính các đơn đã hoàn thành** (trạng thái "Đã giao"). Trong trang admin, mỗi đơn chưa xong có nút "Hoàn thành". Bấm nút này, đơn chuyển sang "Đã giao" và doanh thu được cộng ngay. Tháng ghi nhận doanh thu là tháng hoàn thành.
+- API mới: `POST /api/admin/orders/:id/complete` (hoàn thành đơn), `POST /api/admin/upload` (tải ảnh lên, body `{ "dataUrl": "data:image/jpeg;base64,..." }`, trả về `{ "url": "/uploads/xxxx.jpg" }`).
+- Ảnh tải lên được lưu trong `public/uploads/`. Hãy sao lưu thư mục này cùng database. Mỗi sản phẩm tối đa 8 ảnh, chỉ nhận PNG, JPEG, WebP.
+- Thêm ảnh trong trang admin: bấm Thêm hoặc Sửa sản phẩm, chọn tệp ảnh từ máy (tự thu nhỏ về tối đa 900px) hoặc dán đường dẫn ảnh. Ảnh đầu tiên là ảnh chính.
