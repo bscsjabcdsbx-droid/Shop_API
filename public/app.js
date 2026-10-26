@@ -1081,6 +1081,17 @@ function go(v, a = null) {
   scrollTo(0, 0);
 }
 
+let lastViewKey = '';
+function animateView() {
+  const k = S.view + (S.view === 'admin' ? ':' + S.adm : '') + (S.view === 'detail' || S.view === 'auth' ? ':' + S.arg : '');
+  if (k === lastViewKey) return;
+  lastViewKey = k;
+  const m = $('#main');
+  m.classList.remove('anim-in');
+  void m.offsetWidth;
+  m.classList.add('anim-in');
+}
+
 function render() {
   const V = {
     home,
@@ -1100,6 +1111,7 @@ function render() {
     S.arg = 'login';
   }
   $('#main').innerHTML = (V[S.view] || home)();
+  animateView();
   const n = cart().reduce((s, i) => s + i.qty, 0),
     c = $('#cc');
   c.hidden = !n;

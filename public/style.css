@@ -17,7 +17,8 @@
   14. Trang quản trị (admin): tab, thống kê, biểu đồ, cửa sổ sửa
   15. Footer
   16. Thông báo (toast) & trạng thái rỗng
-  17. Responsive: máy tính bảng & điện thoại
+  17. Hiệu ứng chuyển trang & tab
+  18. Responsive: máy tính bảng & điện thoại
    ========================================================================== */
 
 
@@ -93,10 +94,15 @@ nav a {
   display: flex; align-items: center; justify-content: center;
   min-width: 112px; padding: 0 16px;
   color: var(--mut); cursor: pointer; white-space: nowrap;
-  border-bottom: 2px solid transparent;
+  position: relative;
 }
 nav a:hover { color: var(--fg); }
-nav a.on { color: var(--fg); font-weight: 700; border-bottom-color: var(--acc); }
+nav a.on { color: var(--fg); font-weight: 700; }
+nav a::after {
+  content: ""; position: absolute; left: 16px; right: 16px; bottom: 0; height: 2px;
+  background: var(--acc); transform: scaleX(0); transform-origin: left; transition: transform .28s ease;
+}
+nav a.on::after { transform: scaleX(1); }
 
 .burger { display: none; }
 .ib {
@@ -347,7 +353,25 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
 
 
 /* ==========================================================================
-  17. RESPONSIVE
+  17. HIỆU ỨNG CHUYỂN TRANG & TAB
+   (nội dung trượt nhẹ lên khi đổi trang hoặc đổi tab admin; gạch chân thanh
+    điều hướng trượt ra; cửa sổ bật lên; tắt hết khi người dùng chọn giảm chuyển động)
+   ========================================================================== */
+@keyframes view-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in  { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+#main.anim-in { animation: view-in .38s cubic-bezier(.2, .7, .2, 1); }
+.ov { animation: fade-in .18s ease; }
+.md { animation: pop-in .22s ease; }
+.chip, .btn, .card { transition: background-color .2s, color .2s, border-color .2s, box-shadow .2s, opacity .2s; }
+@media (prefers-reduced-motion: reduce) {
+  #main.anim-in, .ov, .md { animation: none; }
+  nav a::after { transition: none; }
+}
+
+
+/* ==========================================================================
+  18. RESPONSIVE
    ========================================================================== */
 @media (min-width: 861px) {
   .mo { display: none; }
@@ -370,6 +394,7 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
   }
   nav.open a { min-width: 0; justify-content: flex-start; padding: 12px 0; border-bottom: 0; }
   nav.open a.on { color: var(--acc); }
+  nav.open a::after { display: none; }
 
   /* Bố cục nhiều cột thành một cột */
   .hero, .det, .two, .two.eq { grid-template-columns: 1fr; }
