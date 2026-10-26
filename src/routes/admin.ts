@@ -81,4 +81,84 @@ r.patch("/customers/:id/active", wrap(async (req, res) => {
   const { isActive } = z.object({ isActive: z.boolean() }).parse(req.body);
   res.json(await db.user.update({ where: { id: Number(req.params.id), role: "CUSTOMER" }, data: { isActive }, select: { id: true, isActive: true } }));
 }));
+
+const collectionSchema = z.object({
+  title: z.string().trim().min(2).max(100),
+  categorySlug: z.string().trim().min(1),
+  imageUrl: z.string().url().nullable().optional(),
+  isActive: z.boolean().default(true),
+  position: z.number().int().min(0).default(0),
+});
+
+// Lấy tất cả bộ sưu tập
+r.get("/collections", wrap(async (_req, res) => {
+  const collections = await db.collection.findMany({
+    orderBy: [
+      { position: "asc" },
+      { id: "asc" },
+    ],
+  });
+
+  res.json(collections);
+}));
+
+// Tạo bộ sưu tập
+r.post("/collections", wrap(async (req, res) => {
+  const data = collectionSchema.parse(req.body);
+
+  const category = await db.category.findUnique({
+    where: { slug: data.categorySlug },
+  });
+
+  if (!category) {
+    throw new HttpError(400, "Danh mục không tồn tại");
+  }
+
+  const collection = await db.collection.create({
+    data,
+  });
+
+  res.status(201).json(collection);
+}));
+
+// Chỉnh sửa bộ sưu tập
+r.put("/collections/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new HttpError(400, "ID không hợp lệ");
+  }
+
+  const data = collectionSchema.parse(req.body);
+
+  const category = await db.category.findUnique({
+    where: { slug: data.categorySlug },
+  });
+
+  if (!category) {
+    throw new HttpError(400, "Danh mục không tồn tại");
+  }
+
+  const collection = await db.collection.update({
+    where: { id },
+    data,
+  });
+
+  res.json(collection);
+}));
+
+// Xóa bộ sưu tập
+r.delete("/collections/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new HttpError(400, "ID không hợp lệ");
+  }
+
+  await db.collection.delete({
+    where: { id },
+  });
+
+  res.json({ ok: true });
+}));
 export default r;

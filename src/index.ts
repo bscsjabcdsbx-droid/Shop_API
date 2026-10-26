@@ -9,6 +9,7 @@ import auth from "./routes/auth.js";
 import cart from "./routes/cart.js";
 import orders from "./routes/orders.js";
 import products from "./routes/products.js";
+import collections from "./routes/collections.js";
 
 const app = express();
 app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" }));
@@ -21,6 +22,7 @@ app.use("/api/orders", orders);
 app.use("/api/admin", admin);
 app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "../public")));
 app.use(errorHandler);
+app.use("/api/collections", collections);
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => console.log(`API chạy tại http://localhost:${port}`));
