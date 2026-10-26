@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { db, HttpError, wrap } from "../lib.js";
+import { requireAuth, uid } from "../lib.js";
 
 const r = Router();
 const q = z.object({
@@ -52,5 +53,58 @@ r.get("/:slug", wrap(async (req, res) => {
   res.json({ ...detail, variants, reviews,
     rating: reviews.length ? +(reviews.reduce((s, x) => s + x.rating, 0) / reviews.length).toFixed(1) : 0,
     reviewCount: reviews.length, inStock: variants.some(v => v.stock > 0), related: related.map(withRating) });
+}));
+
+const reviewSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().min(5).max(1000),
+});
+
+r.post("/:id/reviews", requireAuth, wrap(async (req, res) => {
+  const productId = Number(req.params.id);
+  const userId = uid(req);
+  const { rating, comment } = reviewSchema.parse(req.body);
+
+  if (!Number.isSafeInteger(productId) || productId <= 0) {
+    throw new HttpError(400, "ID sản phẩm không hợp lệ");
+  }
+
+  const product = await db.product.findFirst({
+    where: { id: productId, isActive: true },
+  });
+
+  if (!product) {
+    throw new HttpError(404, "Không tìm thấy sản phẩm");
+  }
+
+  const purchased = await db.orderItem.findFirst({
+    where: {
+      variant: { productId },
+      order: {
+        userId,
+        status: "DELIVERED",
+      },
+    },
+  });
+
+  if (!purchased) {
+    throw new HttpError(
+      403,
+      "Bạn cần mua và nhận sản phẩm trước khi đánh giá"
+    );
+  }
+
+  const review = await db.review.upsert({
+    where: {
+      userId_productId: { userId, productId },
+    },
+    update: { rating, comment },
+    create: { userId, productId, rating, comment },
+    include: {
+      user: { select: { name: true } },
+    },
+  });
+
+  res.status(200).json(review);
 }));
 export default r;
