@@ -637,7 +637,7 @@
     acol = function () {
       const note = SERVER_COLS
         ? ''
-        : '<p class="err" style="min-height:0;margin:0 0 10px"></p>';
+        : '<p class="err" style="min-height:0;margin:0 0 10px">Máy chủ chưa hỗ trợ bộ sưu tập: thay đổi chỉ lưu trên trình duyệt này. Cập nhật backend để mọi người cùng thấy.</p>';
       return note + acol0();
     };
   }
