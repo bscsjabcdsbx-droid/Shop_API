@@ -158,13 +158,14 @@ input, select, textarea {
 
 /* Ô mật khẩu có nút Hiện/Ẩn */
 .pw { position: relative; }
-.pw input { padding-right: 64px; }
+.pw input { padding-right: 46px; }
 .eye {
-  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
-  background: none; border: 0; cursor: pointer; color: var(--mut);
-  font-size: 13px; font-weight: 600; padding: 6px 8px; border-radius: 6px;
+  position: absolute; top: 50%; right: 5px; transform: translateY(-50%);
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  background: none; border: 0; cursor: pointer; color: var(--mut); border-radius: 8px;
 }
 .eye:hover { color: var(--fg); }
+.eye svg { width: 20px; height: 20px; }
 
 /* Chip (size, phân trang, tab) và ô chọn màu */
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -265,6 +266,21 @@ input, select, textarea {
 .th img.on { border-color: var(--fg); }
 
 
+/* Đánh giá sản phẩm */
+.rvsum { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.rvavg { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rvavg b { font-size: 40px; line-height: 1; }
+.rvdist { flex: 1; min-width: 200px; }
+.rvrow { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 3px 0; }
+.rvrow i { flex: 1; height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; display: block; }
+.rvrow u { display: block; height: 100%; background: #d49a1f; text-decoration: none; }
+.rvlist { display: grid; gap: 8px; }
+.rvitem { padding: 12px; }
+.rvstars { display: flex; gap: 4px; margin-bottom: 8px; }
+.rvs { background: none; border: 0; cursor: pointer; font-size: 30px; line-height: 1; color: var(--line); padding: 2px 4px; }
+.rvs.on, .rvs:hover { color: #d49a1f; }
+
+
 /* ==========================================================================
   12. GIỎ HÀNG & THANH TOÁN
    (dùng lại .two, .box, table, .fld, .f2 ở các phần trên)
@@ -292,6 +308,20 @@ input, select, textarea {
 /* Cửa sổ thêm/sửa sản phẩm */
 .ov { position: fixed; inset: 0; background: #0008; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .md { background: var(--bg); border-radius: 14px; padding: 20px; max-width: 560px; width: 100%; max-height: 90vh; overflow: auto; }
+
+
+/* Quản lý bộ sưu tập */
+.colrow { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.colrow img { width: 72px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; }
+.colinfo { flex: 1; min-width: 160px; }
+.cprev { width: 100%; max-width: 260px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0; }
+
+/* Quản lý ảnh sản phẩm trong cửa sổ sửa */
+.pimgs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+.pi { position: relative; width: 88px; }
+.pi img { width: 88px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.pi .btn { width: 100%; margin-top: 4px; padding: 2px 4px; min-height: 26px; font-size: 11px; }
+.px { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--bg); cursor: pointer; line-height: 1; font-size: 12px; }
 
 
 /* ==========================================================================

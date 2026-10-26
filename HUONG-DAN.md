@@ -87,9 +87,23 @@ curl http://localhost:4000/api/products?category=ao&sort=price_asc
 - Dùng PostgreSQL có sao lưu định kỳ.
 - Đặt `CLIENT_ORIGIN` đúng tên miền nếu giao diện chạy ở domain khác với API.
 
-## 8. Cập nhật: ảnh sản phẩm, hoàn thành đơn, doanh thu
-- Sau khi cập nhật code, chạy lại `npm run db:push` để thêm cột `deliveredAt` vào bảng Order. Dữ liệu cũ được giữ nguyên.
-- **Doanh thu chỉ tính các đơn đã hoàn thành** (trạng thái "Đã giao"). Trong trang admin, mỗi đơn chưa xong có nút "Hoàn thành". Bấm nút này, đơn chuyển sang "Đã giao" và doanh thu được cộng ngay. Tháng ghi nhận doanh thu là tháng hoàn thành.
-- API mới: `POST /api/admin/orders/:id/complete` (hoàn thành đơn), `POST /api/admin/upload` (tải ảnh lên, body `{ "dataUrl": "data:image/jpeg;base64,..." }`, trả về `{ "url": "/uploads/xxxx.jpg" }`).
-- Ảnh tải lên được lưu trong `public/uploads/`. Hãy sao lưu thư mục này cùng database. Mỗi sản phẩm tối đa 8 ảnh, chỉ nhận PNG, JPEG, WebP.
-- Thêm ảnh trong trang admin: bấm Thêm hoặc Sửa sản phẩm, chọn tệp ảnh từ máy (tự thu nhỏ về tối đa 900px) hoặc dán đường dẫn ảnh. Ảnh đầu tiên là ảnh chính.
+## 8. Cập nhật mới: đánh giá, bộ sưu tập, ảnh (chỉ thêm, không sửa chức năng cũ)
+Các endpoint cũ giữ nguyên hành vi. Bản cập nhật chỉ **thêm** endpoint mới. Giao diện tự nhận biết: nếu máy chủ chưa có endpoint mới, tính năng đó chạy ở chế độ dự phòng và báo rõ trên màn hình, các phần còn lại vẫn dùng bình thường.
+
+| Tính năng | Endpoint mới | Cần cập nhật database? |
+|---|---|---|
+| Khách đánh giá sao và nhận xét | POST /api/products/:id/reviews (đăng nhập, chỉ khi đã nhận hàng thành công) | Không (dùng bảng Review có sẵn) |
+| Xem bộ sưu tập trang chủ | GET /api/collections | Có: thêm bảng Collection |
+| Admin quản lý bộ sưu tập | GET, POST /api/admin/collections ; PUT, DELETE /api/admin/collections/:id ; POST /api/admin/collections/:id/move | Có: thêm bảng Collection |
+| Admin tải ảnh lên | POST /api/admin/upload | Không |
+
+**Cách cập nhật:**
+1. Thay code backend bằng bản mới, cài lại và chạy lại server (trên Render: đẩy code lên rồi Deploy).
+2. Chạy `npx prisma db push` một lần. Lệnh này chỉ **thêm** bảng Collection, không đụng tới bảng và dữ liệu cũ.
+3. Vào trang admin, mở tab "Bộ sưu tập", bấm "Nhập bộ sưu tập mặc định" để tạo 5 bộ sưu tập ban đầu, sau đó thêm, sửa, ẩn, đổi thứ tự tùy ý.
+
+**Quy tắc nghiệp vụ**
+- Chỉ khách có đơn ở trạng thái "Đã giao" chứa sản phẩm đó mới gửi được đánh giá (1 đến 5 sao, nhận xét 5 đến 1000 ký tự). Mỗi khách một đánh giá cho mỗi sản phẩm, gửi lại sẽ cập nhật đánh giá cũ.
+- Nút "Hoàn thành" của admin đưa đơn qua các trạng thái hợp lệ cho tới "Đã giao" bằng API đổi trạng thái sẵn có.
+- Doanh thu trên trang tổng quan do giao diện tính, chỉ cộng các đơn "Đã giao". Số liệu trên server (`/api/admin/stats`) không bị thay đổi.
+- Ảnh tải lên lưu trong `public/uploads/`. Trên Render gói miễn phí, ổ đĩa bị xóa mỗi lần deploy lại, nên hãy dán đường dẫn ảnh từ dịch vụ lưu trữ ảnh hoặc gắn Persistent Disk.
