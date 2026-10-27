@@ -17,15 +17,17 @@ r.get("/stats", wrap(async (_req, res) => {
   res.json({ revenue: rev._sum.total ?? 0, orders, customers, products, recentOrders: recent, topProducts: top, monthly: monthly.map(m => ({ month: m.month, revenue: Number(m.revenue) })).reverse() });
 }));
 
+const imageRef = z.string().min(1).max(2000).refine(u => /^(https?:\/\/|\/)/.test(u), "Đường dẫn ảnh phải bắt đầu bằng http(s):// hoặc /");
+
 const productSchema = z.object({
   name: z.string().min(2), slug: z.string().regex(/^[a-z0-9-]+$/), description: z.string().min(1), material: z.string().optional(),
   price: z.number().int().min(0), salePrice: z.number().int().min(0).nullable().optional(), categoryId: z.number().int(), isActive: z.boolean().default(true),
-  images: z.array(z.string().url()).min(1), variants: z.array(z.object({ size: z.string(), color: z.string(), stock: z.number().int().min(0) })).min(1),
+  images: z.array(imageRef).max(8), variants: z.array(z.object({ size: z.string(), color: z.string(), stock: z.number().int().min(0) })).min(1),
 }).refine(p => p.salePrice == null || p.salePrice < p.price, { message: "Giá khuyến mãi phải thấp hơn giá gốc" });
 
 r.get("/products", wrap(async (req, res) => {
   const s = String(req.query.q ?? "");
-  res.json(await db.product.findMany({ where: s ? { name: { contains: s, mode: "insensitive" } } : {}, orderBy: { id: "desc" }, include: { category: true, images: { take: 1 }, variants: true } }));
+  res.json(await db.product.findMany({ where: s ? { name: { contains: s, mode: "insensitive" } } : {}, orderBy: { id: "desc" }, include: { category: true, images: { orderBy: { position: "asc" } }, variants: true } }));
 }));
 r.post("/products", wrap(async (req, res) => {
   const { images, variants, ...d } = productSchema.parse(req.body);
@@ -42,9 +44,18 @@ r.put("/products/:id", wrap(async (req, res) => {
 }));
 r.delete("/products/:id", wrap(async (req, res) => {
   const id = Number(req.params.id);
-  try { await db.product.delete({ where: { id } }); }
-  catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") { await db.product.update({ where: { id }, data: { isActive: false } }); return res.json({ ok: true, archived: true }); }
+  if (!Number.isSafeInteger(id) || id <= 0) throw new HttpError(400, "ID không hợp lệ");
+  const exists = await db.product.findUnique({ where: { id }, select: { id: true } });
+  if (!exists) throw new HttpError(404, "Không tìm thấy sản phẩm");
+  try {
+    // Biến thể, ảnh, đánh giá, yêu thích và mục trong giỏ bị xóa theo; chi tiết đơn hàng được giữ lại (variantId = null)
+    await db.product.delete({ where: { id } });
+  } catch (e) {
+    // Database chưa được cập nhật (chưa chạy `npx prisma db push`): ẩn sản phẩm thay vì báo lỗi
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2003") {
+      await db.product.update({ where: { id }, data: { isActive: false } });
+      return res.json({ ok: true, archived: true });
+    }
     throw e;
   }
   res.json({ ok: true });
@@ -66,7 +77,7 @@ r.patch("/orders/:id/status", wrap(async (req, res) => {
     if (!o) throw new HttpError(404, "Không tìm thấy đơn hàng");
     if (!flow[o.status].includes(status)) throw new HttpError(409, `Không thể chuyển từ ${o.status} sang ${status}`);
     await tx.order.update({ where: { id: o.id }, data: { status } });
-    if (status === "CANCELLED") for (const i of o.items) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
+    if (status === "CANCELLED") for (const i of o.items) if (i.variantId !== null) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
   });
   res.json({ ok: true });
 }));
@@ -85,80 +96,79 @@ r.patch("/customers/:id/active", wrap(async (req, res) => {
 const collectionSchema = z.object({
   title: z.string().trim().min(2).max(100),
   categorySlug: z.string().trim().min(1),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: imageRef.nullable().optional(),
   isActive: z.boolean().default(true),
-  position: z.number().int().min(0).default(0),
+  position: z.number().int().min(0).optional(),
 });
+const byPosition = [{ position: "asc" as const }, { id: "asc" as const }];
 
-// Lấy tất cả bộ sưu tập
+function parseId(raw: string) {
+  const id = Number(raw);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new HttpError(400, "ID không hợp lệ");
+  return id;
+}
+
+async function assertCategory(slug: string) {
+  const category = await db.category.findUnique({ where: { slug } });
+  if (!category) throw new HttpError(400, "Danh mục không tồn tại");
+}
+
+// Lấy tất cả bộ sưu tập (kể cả đang ẩn)
 r.get("/collections", wrap(async (_req, res) => {
-  const collections = await db.collection.findMany({
-    orderBy: [
-      { position: "asc" },
-      { id: "asc" },
-    ],
-  });
-
-  res.json(collections);
+  res.json(await db.collection.findMany({ orderBy: byPosition }));
 }));
 
-// Tạo bộ sưu tập
+// Tạo bộ sưu tập (không gửi position thì xếp cuối danh sách)
 r.post("/collections", wrap(async (req, res) => {
-  const data = collectionSchema.parse(req.body);
-
-  const category = await db.category.findUnique({
-    where: { slug: data.categorySlug },
-  });
-
-  if (!category) {
-    throw new HttpError(400, "Danh mục không tồn tại");
-  }
-
+  const { position, imageUrl, ...data } = collectionSchema.parse(req.body);
+  await assertCategory(data.categorySlug);
+  const last = await db.collection.aggregate({ _max: { position: true } });
   const collection = await db.collection.create({
-    data,
+    data: { ...data, imageUrl: imageUrl ?? null, position: position ?? (last._max.position ?? 0) + 1 },
   });
-
   res.status(201).json(collection);
 }));
 
-// Chỉnh sửa bộ sưu tập
+// Chỉnh sửa bộ sưu tập (không gửi position thì giữ nguyên vị trí cũ)
 r.put("/collections/:id", wrap(async (req, res) => {
-  const id = Number(req.params.id);
-
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    throw new HttpError(400, "ID không hợp lệ");
-  }
-
-  const data = collectionSchema.parse(req.body);
-
-  const category = await db.category.findUnique({
-    where: { slug: data.categorySlug },
-  });
-
-  if (!category) {
-    throw new HttpError(400, "Danh mục không tồn tại");
-  }
-
+  const id = parseId(req.params.id);
+  const { position, imageUrl, ...data } = collectionSchema.parse(req.body);
+  await assertCategory(data.categorySlug);
   const collection = await db.collection.update({
     where: { id },
-    data,
+    data: { ...data, imageUrl: imageUrl ?? null, ...(position !== undefined && { position }) },
   });
-
   res.json(collection);
 }));
 
 // Xóa bộ sưu tập
 r.delete("/collections/:id", wrap(async (req, res) => {
-  const id = Number(req.params.id);
-
-  if (!Number.isSafeInteger(id) || id <= 0) {
-    throw new HttpError(400, "ID không hợp lệ");
-  }
-
-  await db.collection.delete({
-    where: { id },
-  });
-
+  await db.collection.delete({ where: { id: parseId(req.params.id) } });
   res.json({ ok: true });
 }));
+
+// Đổi thứ tự lên (-1) hoặc xuống (1); đánh lại số thứ tự 1..n để không bị trùng vị trí
+r.post("/collections/:id/move", wrap(async (req, res) => {
+  const id = parseId(req.params.id);
+  const { direction } = z.object({ direction: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body);
+  const all = await db.collection.findMany({ orderBy: byPosition });
+  const i = all.findIndex(c => c.id === id), j = i + direction;
+  if (i < 0) throw new HttpError(404, "Không tìm thấy bộ sưu tập");
+  if (j >= 0 && j < all.length) {
+    const ids = all.map(c => c.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await db.$transaction(ids.map((cid, k) => db.collection.update({ where: { id: cid }, data: { position: k + 1 } })));
+  }
+  res.json({ ok: true });
+}));
+
+// Tải ảnh lên: lưu trong database, trả về đường dẫn /api/uploads/:id
+r.post("/upload", wrap(async (req, res) => {
+  const { dataUrl } = z.object({ dataUrl: z.string().max(8_000_000) }).parse(req.body);
+  const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) throw new HttpError(400, "Chỉ nhận ảnh PNG, JPEG hoặc WebP");
+  const row = await db.upload.create({ data: { mime: m[1], data: Buffer.from(m[2], "base64") }, select: { id: true } });
+  res.status(201).json({ url: `/api/uploads/${row.id}` });
+}));
+
 export default r;

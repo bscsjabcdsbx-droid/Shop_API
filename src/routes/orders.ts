@@ -55,7 +55,7 @@ r.post("/:code/cancel", wrap(async (req, res) => {
     if (!o) throw new HttpError(404, "Không tìm thấy đơn hàng");
     if (o.status !== "PENDING") throw new HttpError(409, "Chỉ hủy được đơn đang chờ xác nhận");
     await tx.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
-    for (const i of o.items) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
+    for (const i of o.items) if (i.variantId !== null) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
   });
   res.json({ ok: true });
 }));

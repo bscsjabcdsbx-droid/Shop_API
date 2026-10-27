@@ -804,7 +804,7 @@ function dash() {
 function aprod() {
   const q = S.aq.toLowerCase(),
     l = db.products.filter(p => !q || p.name.toLowerCase().includes(q));
-  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}</div></td><td>${CATS.find(c => c[0] === p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${Object.values(p.stock).reduce((a, b) => a + b, 0)}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
+  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}${p.active === false ? ' <span class="badge">Đã ẩn</span>' : ''}</div></td><td>${CATS.find(c => c[0] === p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${Object.values(p.stock).reduce((a, b) => a + b, 0)}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
 }
 
 function aord() {
@@ -1485,7 +1485,7 @@ Object.assign(A, {
   piurl: () => {
     const i = $('#m_u'),
       u = i.value.trim();
-    if (!/^(https?:\/\/|images\/|\/uploads\/)\S+$/.test(u)) return toast('Đường dẫn ảnh không hợp lệ');
+    if (!/^(https?:\/\/|\/?images\/|\/uploads\/|\/api\/uploads\/)\S+$/.test(u)) return toast('Đường dẫn ảnh không hợp lệ');
     if (S.pimgs.length >= 8) return toast('Tối đa 8 ảnh');
     S.pimgs.push(u);
     i.value = '';
@@ -1553,7 +1553,7 @@ Object.assign(A, {
   colurl: () => {
     const i = $('#c_u'),
       u = i.value.trim();
-    if (!/^(https?:\/\/|images\/|\/uploads\/)\S+$/.test(u)) return toast('Đường dẫn ảnh không hợp lệ');
+    if (!/^(https?:\/\/|\/?images\/|\/uploads\/|\/api\/uploads\/)\S+$/.test(u)) return toast('Đường dẫn ảnh không hợp lệ');
     S.cimg = u;
     i.value = '';
     renderColPrev();

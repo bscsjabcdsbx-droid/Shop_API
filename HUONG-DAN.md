@@ -97,6 +97,12 @@ Các endpoint cũ giữ nguyên hành vi. Bản cập nhật chỉ **thêm** end
 | Admin quản lý bộ sưu tập | GET, POST /api/admin/collections ; PUT, DELETE /api/admin/collections/:id ; POST /api/admin/collections/:id/move | Có: thêm bảng Collection |
 | Admin tải ảnh lên | POST /api/admin/upload | Không |
 
+## 9. upload code lên github
+chạy 
+git add .                                                                                                     
+git commit -m "Tên lần upload đó (yêu cầu phải nêu rõ lần đó chỉnh sửa những gì)"
+git push origin main 
+
 **Cách cập nhật:**
 1. Thay code backend bằng bản mới, cài lại và chạy lại server (trên Render: đẩy code lên rồi Deploy).
 2. Chạy `npx prisma db push` một lần. Lệnh này chỉ **thêm** bảng Collection, không đụng tới bảng và dữ liệu cũ.

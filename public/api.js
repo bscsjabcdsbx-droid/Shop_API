@@ -24,6 +24,7 @@
   const CATIDS = {};
   let TOKEN = '';
   let SERVER_COLS = false;
+  let ADMIN_P = false;
   let VM = {};
   try {
     TOKEN = localStorage.getItem('mono-token') || '';
@@ -39,7 +40,7 @@
     return !!u && u.role === 'admin';
   };
   const abs = u => (u && u.startsWith('/') ? ORIGIN + u : u);
-  const rel = u => (ORIGIN && u && u.startsWith(ORIGIN + '/') ? u.slice(ORIGIN.length) : u);
+  const rel = u => (u && u.startsWith('images/') ? '/' + u : ORIGIN && u && u.startsWith(ORIGIN + '/') ? u.slice(ORIGIN.length) : u);
 
   /* ==========================================================================
    2. GỌI API
@@ -96,7 +97,8 @@
       vid,
       date: Date.parse(s.createdAt),
       rating: s.rating || 0,
-      images: (s.images || []).map(i => abs(i.url))
+      images: (s.images || []).map(i => abs(i.url)),
+      active: s.isActive !== false
     };
   };
   const mapO = o => ({
@@ -128,7 +130,8 @@
     title: c.title,
     cat: c.categorySlug,
     image: abs(c.imageUrl || ''),
-    active: c.isActive
+    active: c.isActive,
+    pos: c.position
   });
   const mapReview = r => ({ u: r.user.name, uid: r.userId, r: r.rating, c: r.comment, d: Date.parse(r.createdAt) });
 
@@ -212,6 +215,9 @@
       if (S.adm === 'dash') {
         S.stats = await rq('/admin/stats');
         db.orders = (await rq('/admin/orders')).map(mapO);
+      } else if (S.adm === 'aprod') {
+        db.products = (await rq('/admin/products')).map(mapP);
+        ADMIN_P = true;
       } else if (S.adm === 'aord') db.orders = (await rq('/admin/orders')).map(mapO);
       else if (S.adm === 'acol' && SERVER_COLS) db.collections = (await rq('/admin/collections')).map(mapCol);
       else if (S.adm === 'acus') {
@@ -233,6 +239,12 @@
     } catch (e) {
       toast(e.message);
     }
+  }
+  /* Tải lại danh sách sản phẩm: trong tab Sản phẩm của admin thì lấy cả sản phẩm đang ẩn */
+  async function reloadProducts() {
+    if (ADMIN_P && S.view === 'admin' && S.adm === 'aprod') {
+      db.products = (await rq('/admin/products')).map(mapP);
+    } else await loadProducts();
   }
   async function afterAuth(res) {
     setTok(res.token);
@@ -267,6 +279,11 @@
     rate = p => p.rating || 0;
     const go0 = go;
     go = function (v, a = null) {
+      if (ADMIN_P && v !== 'admin') {
+        ADMIN_P = false;
+        db.products = db.products.filter(p => p.active !== false);
+        loadProducts().then(() => render()).catch(() => {});
+      }
       go0(v, a);
       if (v === 'detail') {
         loadDetail(a);
@@ -489,7 +506,7 @@
       if (!confirm('Xóa sản phẩm này? Hành động không thể hoàn tác.')) return;
       try {
         const r = await rq('/admin/products/' + p, { method: 'DELETE' });
-        await loadProducts();
+        await reloadProducts();
         render();
         toast(r.archived ? 'Sản phẩm đã có đơn hàng nên được ẩn thay vì xóa' : 'Đã xóa sản phẩm');
       } catch (e) {
@@ -538,7 +555,7 @@
       try {
         await rq(old ? '/admin/products/' + old.id : '/admin/products', { method: old ? 'PUT' : 'POST', body });
         modal('');
-        await loadProducts();
+        await reloadProducts();
         render();
         toast('Đã lưu sản phẩm');
       } catch (e) {
@@ -620,7 +637,10 @@
     };
     colSave = async (id, d) => {
       if (!SERVER_COLS) return colSave0(id, d);
-      const body = { title: d.title, categorySlug: d.cat, imageUrl: d.image ? rel(d.image) : null, isActive: d.active };
+      const l = getCols(),
+        cur = id ? l.find(c => c.id == id) : null;
+      const pos = cur && cur.pos != null ? cur.pos : Math.max(0, ...l.map(c => c.pos || 0)) + 1;
+      const body = { title: d.title, categorySlug: d.cat, imageUrl: d.image ? rel(d.image) : null, isActive: d.active, position: pos };
       await rq(id ? '/admin/collections/' + id : '/admin/collections', { method: id ? 'PUT' : 'POST', body });
       await refreshCols();
     };
@@ -631,7 +651,25 @@
     };
     colMove = async (id, dir) => {
       if (!SERVER_COLS) return colMove0(id, dir);
-      await rq('/admin/collections/' + id + '/move', { method: 'POST', body: { direction: dir } });
+      try {
+        await rq('/admin/collections/' + id + '/move', { method: 'POST', body: { direction: dir } });
+      } catch (e) {
+        if (e.status !== 404) throw e;
+        /* Máy chủ chưa có endpoint /move: đổi thứ tự bằng cách ghi lại số position */
+        const l = getCols().slice(),
+          i = l.findIndex(c => c.id == id),
+          k = i + dir;
+        if (i < 0 || k < 0 || k >= l.length) return;
+        [l[i], l[k]] = [l[k], l[i]];
+        for (let n = 0; n < l.length; n++) {
+          if (l[n].pos === n + 1) continue;
+          const c = l[n];
+          await rq('/admin/collections/' + c.id, {
+            method: 'PUT',
+            body: { title: c.title, categorySlug: c.cat, imageUrl: c.image ? rel(c.image) : null, isActive: c.active, position: n + 1 }
+          });
+        }
+      }
       await refreshCols();
     };
     acol = function () {
