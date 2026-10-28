@@ -168,6 +168,17 @@ model Wishlist {
   @@unique([userId, productId])
 }
 
+model CollectionImage {
+  id           Int        @id @default(autoincrement())
+  collectionId Int
+  url          String
+  caption      String     @default("")
+  position     Int        @default(0)
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId])
+}
+
 model Collection {
   id           Int      @id @default(autoincrement())
   title        String
@@ -178,6 +189,7 @@ model Collection {
   createdAt    DateTime @default(now())
 
   @@index([isActive, position])
+  images       CollectionImage[]
 }
 
 model Upload {

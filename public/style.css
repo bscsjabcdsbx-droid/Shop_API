@@ -215,6 +215,18 @@ input, select, textarea {
 .dots button { width: 9px; height: 9px; border-radius: 50%; border: 0; background: #fffa; padding: 0; cursor: pointer; transition: width .25s; }
 .dots button.on { background: var(--acc); width: 22px; border-radius: 5px; }
 
+/* Trang chi tiết bộ sưu tập: nhiều ảnh minh họa, mỗi ảnh một mô tả */
+.colhead { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 20px 0 16px; }
+.colhead h1 { font-size: clamp(26px, 4vw, 40px); margin: 0; }
+.cgal { columns: 3 260px; column-gap: 14px; }
+.cfig { margin: 0 0 14px; break-inside: avoid; cursor: zoom-in; border-radius: 12px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
+.cfig img { width: 100%; display: block; transition: transform .35s ease; }
+.cfig:hover img { transform: scale(1.03); }
+.cfig figcaption { padding: 10px 12px; color: var(--mut); font-size: 14px; }
+.lb .lbimg { width: 100%; max-height: 68vh; object-fit: contain; border-radius: 10px; background: var(--bg2); }
+.lb .lbcap { margin: 10px 0; }
+.md:has(.lb) { max-width: 860px; }
+
 /* Thẻ danh mục */
 .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 .cat { position: relative; cursor: pointer; border-radius: 12px; overflow: hidden; }
@@ -321,6 +333,13 @@ input, select, textarea {
 .colrow img { width: 72px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 8px; }
 .colinfo { flex: 1; min-width: 160px; }
 .cprev { width: 100%; max-width: 260px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); margin: 6px 0; }
+
+/* Ảnh minh họa của bộ sưu tập trong cửa sổ sửa */
+.cims { display: grid; gap: 10px; margin: 6px 0 10px; }
+.cim { display: flex; gap: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; }
+.cim img { width: 84px; height: 105px; object-fit: cover; border-radius: 8px; flex: none; }
+.cimb { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.cimb textarea { resize: vertical; }
 
 /* Quản lý ảnh sản phẩm trong cửa sổ sửa */
 .pimgs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }

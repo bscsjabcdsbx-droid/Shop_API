@@ -99,7 +99,11 @@ const collectionSchema = z.object({
   imageUrl: imageRef.nullable().optional(),
   isActive: z.boolean().default(true),
   position: z.number().int().min(0).optional(),
+  images: z.array(z.object({ url: imageRef, caption: z.string().trim().max(300).default("") })).max(12).optional(),
 });
+const withImages = { images: { orderBy: { position: "asc" as const } } };
+const toImages = (images: { url: string; caption: string }[]) =>
+  images.map((m, i) => ({ url: m.url, caption: m.caption, position: i }));
 const byPosition = [{ position: "asc" as const }, { id: "asc" as const }];
 
 function parseId(raw: string) {
@@ -115,16 +119,22 @@ async function assertCategory(slug: string) {
 
 // Lấy tất cả bộ sưu tập (kể cả đang ẩn)
 r.get("/collections", wrap(async (_req, res) => {
-  res.json(await db.collection.findMany({ orderBy: byPosition }));
+  res.json(await db.collection.findMany({ orderBy: byPosition, include: withImages }));
 }));
 
 // Tạo bộ sưu tập (không gửi position thì xếp cuối danh sách)
 r.post("/collections", wrap(async (req, res) => {
-  const { position, imageUrl, ...data } = collectionSchema.parse(req.body);
+  const { position, imageUrl, images, ...data } = collectionSchema.parse(req.body);
   await assertCategory(data.categorySlug);
   const last = await db.collection.aggregate({ _max: { position: true } });
   const collection = await db.collection.create({
-    data: { ...data, imageUrl: imageUrl ?? null, position: position ?? (last._max.position ?? 0) + 1 },
+    data: {
+      ...data,
+      imageUrl: imageUrl ?? null,
+      position: position ?? (last._max.position ?? 0) + 1,
+      ...(images && { images: { create: toImages(images) } }),
+    },
+    include: withImages,
   });
   res.status(201).json(collection);
 }));
@@ -132,11 +142,21 @@ r.post("/collections", wrap(async (req, res) => {
 // Chỉnh sửa bộ sưu tập (không gửi position thì giữ nguyên vị trí cũ)
 r.put("/collections/:id", wrap(async (req, res) => {
   const id = parseId(req.params.id);
-  const { position, imageUrl, ...data } = collectionSchema.parse(req.body);
+  const { position, imageUrl, images, ...data } = collectionSchema.parse(req.body);
   await assertCategory(data.categorySlug);
-  const collection = await db.collection.update({
-    where: { id },
-    data: { ...data, imageUrl: imageUrl ?? null, ...(position !== undefined && { position }) },
+  // Có gửi images thì thay toàn bộ danh sách ảnh; không gửi thì giữ nguyên ảnh cũ
+  const collection = await db.$transaction(async tx => {
+    if (images !== undefined) await tx.collectionImage.deleteMany({ where: { collectionId: id } });
+    return tx.collection.update({
+      where: { id },
+      data: {
+        ...data,
+        imageUrl: imageUrl ?? null,
+        ...(position !== undefined && { position }),
+        ...(images !== undefined && { images: { create: toImages(images) } }),
+      },
+      include: withImages,
+    });
   });
   res.json(collection);
 }));

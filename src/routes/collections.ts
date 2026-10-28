@@ -10,6 +10,7 @@ r.get("/", wrap(async (_req, res) => {
       { position: "asc" },
       { id: "asc" },
     ],
+    include: { images: { orderBy: { position: "asc" } } },
   });
 
   res.json(collections);

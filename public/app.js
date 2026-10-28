@@ -103,6 +103,7 @@ function getCols() {
       title: s.title,
       cat: s.cat,
       image: s.image || '',
+      images: [],
       active: true
     })))
   );
@@ -376,14 +377,33 @@ function home() {
  <h2 id="newcol">Bộ sưu tập mới</h2><div class="grid">${nw.map(card).join('')}</div>`;
 }
 
+/* Trang chi tiết bộ sưu tập: nhiều ảnh minh họa, mỗi ảnh có mô tả riêng, kèm sản phẩm của danh mục */
+function colView() {
+  const c = getCols().find(x => x.id == S.arg);
+  if (!c) return '<div class="empty"><h2>Không tìm thấy bộ sưu tập</h2><button class="btn" data-a="go" data-p="home">Về trang chủ</button></div>';
+  const pics = colPics(c),
+    prods = db.products.filter(p => p.cat === c.cat),
+    cat = CATS.find(x => x[0] === c.cat),
+    cn = cat ? esc(cat[1]) : '';
+  return `<div class="colhead"><button class="btn o s" data-a="go" data-p="home">← Trang chủ</button><span class="mut">Bộ sưu tập</span><h1>${esc(c.title)}</h1></div>
+  ${pics.length ? `<div class="cgal">${pics.map((m, i) => `<figure class="cfig" data-a="lbopen" data-p="${i}" tabindex="0"><img src="${esc(m.url)}" alt="${esc(m.caption || c.title)}" loading="lazy">${m.caption ? `<figcaption>${esc(m.caption)}</figcaption>` : ''}</figure>`).join('')}</div>` : '<p class="mut">Bộ sưu tập này chưa có ảnh minh họa.</p>'}
+  <h2>Sản phẩm trong bộ sưu tập${cn ? ' · ' + cn : ''}</h2>
+  ${prods.length ? `<div class="grid">${prods.map(card).join('')}</div><div style="text-align:center;margin-top:20px"><button class="btn o" data-a="cat" data-p="${c.cat}">Xem tất cả ${cn}</button></div>` : '<p class="mut">Chưa có sản phẩm trong danh mục này.</p>'}`;
+}
+function lbHtml(c, i) {
+  const L = colPics(c),
+    m = L[i];
+  return `<div class="lb"><img class="lbimg" src="${esc(m.url)}" alt="${esc(m.caption || c.title)}">${m.caption ? `<p class="lbcap">${esc(m.caption)}</p>` : ''}<div class="row" style="justify-content:space-between"><span class="mut">${i + 1} / ${L.length}</span><div class="row"><button class="btn o s" data-a="lbgo" data-p="-1"${L.length > 1 ? '' : ' disabled'}>‹ Trước</button><button class="btn o s" data-a="lbgo" data-p="1"${L.length > 1 ? '' : ' disabled'}>Sau ›</button><button class="btn s" data-a="mclose">Đóng</button></div></div></div>`;
+}
+
 function carouselHtml(AC, top) {
   if (!AC.length)
     return `<img src="${img(top[0], 0)}" alt="MONO" style="border-radius:14px;width:100%;aspect-ratio:1/1;object-fit:cover">`;
-  return `<div class="car" id="car" role="region" aria-roledescription="carousel" aria-label="Bộ sưu tập nổi bật"><div class="trk" id="trk">${AC.map(c => `<div class="sl" data-a="cat" data-p="${c.cat}" title="Xem bộ sưu tập ${esc(c.title)}"><img src="${esc(colImg(c))}" alt="Bộ sưu tập ${esc(c.title)}"><div class="cap"><span>Bộ sưu tập</span><h3>${esc(c.title)}</h3></div></div>`).join('')}</div><button class="cb pv" data-a="cgo" data-p="-1" aria-label="Slide trước">‹</button><button class="cb nx" data-a="cgo" data-p="1" aria-label="Slide sau">›</button><div class="dots">${AC.map((_, i) => `<button class="${i ? '' : 'on'}" data-a="cto" data-p="${i}" aria-label="Slide ${i + 1}"></button>`).join('')}</div></div>`;
+  return `<div class="car" id="car" role="region" aria-roledescription="carousel" aria-label="Bộ sưu tập nổi bật"><div class="trk" id="trk">${AC.map(c => `<div class="sl" data-a="${c.id > 0 ? 'colv' : 'cat'}" data-p="${c.id > 0 ? c.id : c.cat}" title="Xem bộ sưu tập ${esc(c.title)}"><img src="${esc(colImg(c))}" alt="Bộ sưu tập ${esc(c.title)}"><div class="cap"><span>Bộ sưu tập</span><h3>${esc(c.title)}</h3></div></div>`).join('')}</div><button class="cb pv" data-a="cgo" data-p="-1" aria-label="Slide trước">‹</button><button class="cb nx" data-a="cgo" data-p="1" aria-label="Slide sau">›</button><div class="dots">${AC.map((_, i) => `<button class="${i ? '' : 'on'}" data-a="cto" data-p="${i}" aria-label="Slide ${i + 1}"></button>`).join('')}</div></div>`;
 }
 
-const colImg = c =>
-  c.image || img(db.products.find(p => p.cat === c.cat) || { cat: c.cat, name: c.title }, 0);
+const colPics = c => (c.images && c.images.length ? c.images : c.image ? [{ url: c.image, caption: '' }] : []);
+const colImg = c => (colPics(c)[0] || {}).url || img(db.products.find(p => p.cat === c.cat) || { cat: c.cat, name: c.title }, 0);
 
 let ci = 0,
   ct = null,
@@ -857,33 +877,42 @@ let colMove = async (id, dir) => {
 
 function acol() {
   const l = getCols();
-  return `<div class="row" style="margin-bottom:12px;justify-content:space-between"><span class="mut">Bộ sưu tập hiển thị ở băng chuyền trang chủ theo thứ tự bên dưới.</span><div class="row">${l.length ? '' : '<button class="btn o" data-a="coldef">Nhập bộ sưu tập mặc định</button>'}<button class="btn" data-a="coledit" data-p="0">+ Thêm bộ sưu tập</button></div></div>${l.length ? l.map((c, i) => `<div class="box colrow"><img src="${esc(colImg(c))}" alt=""><div class="colinfo"><b>${esc(c.title)}</b><br><span class="mut">Danh mục: ${esc((CATS.find(x => x[0] === c.cat) || [0, c.cat])[1])} · ${c.active ? 'Đang hiển thị' : 'Đang ẩn'}</span></div><div class="row"><button class="btn o s" data-a="colup" data-p="${c.id}" aria-label="Đưa lên"${i ? '' : ' disabled'}>↑</button><button class="btn o s" data-a="coldown" data-p="${c.id}" aria-label="Đưa xuống"${i < l.length - 1 ? '' : ' disabled'}>↓</button><button class="btn o s" data-a="coltog" data-p="${c.id}">${c.active ? 'Ẩn' : 'Hiện'}</button><button class="btn o s" data-a="coledit" data-p="${c.id}">Sửa</button><button class="btn d s" data-a="coldel" data-p="${c.id}">Xóa</button></div></div>`).join('') : '<div class="empty">Chưa có bộ sưu tập nào.</div>'}`;
+  return `<div class="row" style="margin-bottom:12px;justify-content:space-between"><span class="mut">Bộ sưu tập hiển thị ở băng chuyền trang chủ theo thứ tự bên dưới.</span><div class="row">${l.length ? '' : '<button class="btn o" data-a="coldef">Nhập bộ sưu tập mặc định</button>'}<button class="btn" data-a="coledit" data-p="0">+ Thêm bộ sưu tập</button></div></div>${l.length ? l.map((c, i) => `<div class="box colrow"><img src="${esc(colImg(c))}" alt=""><div class="colinfo"><b>${esc(c.title)}</b><br><span class="mut">Danh mục: ${esc((CATS.find(x => x[0] === c.cat) || [0, c.cat])[1])} · ${colPics(c).length} ảnh · ${c.active ? 'Đang hiển thị' : 'Đang ẩn'}</span></div><div class="row"><button class="btn o s" data-a="colup" data-p="${c.id}" aria-label="Đưa lên"${i ? '' : ' disabled'}>↑</button><button class="btn o s" data-a="coldown" data-p="${c.id}" aria-label="Đưa xuống"${i < l.length - 1 ? '' : ' disabled'}>↓</button><button class="btn o s" data-a="coltog" data-p="${c.id}">${c.active ? 'Ẩn' : 'Hiện'}</button><button class="btn o s" data-a="coledit" data-p="${c.id}">Sửa</button><button class="btn d s" data-a="coldel" data-p="${c.id}">Xóa</button></div></div>`).join('') : '<div class="empty">Chưa có bộ sưu tập nào.</div>'}`;
 }
 
-function colPrevHtml() {
-  return S.cimg
-    ? `<img class="cprev" src="${esc(S.cimg)}" alt="Ảnh bộ sưu tập"><br><button type="button" class="btn s o" data-a="colclr">Xóa ảnh</button>`
-    : '<p class="mut" style="margin:4px 0">Chưa chọn ảnh, sẽ dùng ảnh sản phẩm đầu tiên của danh mục.</p>';
+function syncCaps() {
+  document.querySelectorAll('[data-cap]').forEach(e => {
+    if (S.cimgs[+e.dataset.cap]) S.cimgs[+e.dataset.cap].caption = e.value.trim();
+  });
 }
+function colImgsHtml() {
+  if (!S.cimgs.length) return '<p class="mut" style="margin:4px 0">Chưa có ảnh, sẽ dùng ảnh sản phẩm đầu tiên của danh mục làm ảnh bìa.</p>';
+  return `<div class="cims">${S.cimgs.map((m, i) => `<div class="cim"><img src="${esc(m.url)}" alt="Ảnh ${i + 1}"><div class="cimb"><span class="mut" style="font-size:12px">${i ? 'Ảnh ' + (i + 1) : 'Ảnh bìa (ảnh đầu tiên)'}</span><textarea data-cap="${i}" rows="2" maxlength="300" placeholder="Mô tả cho ảnh này (ví dụ: phối áo khoác bomber với quần jean)">${esc(m.caption || '')}</textarea><div class="row"><button type="button" class="btn o s" data-a="cimup" data-p="${i}"${i ? '' : ' disabled'} aria-label="Đưa lên">↑</button><button type="button" class="btn o s" data-a="cimdn" data-p="${i}"${i < S.cimgs.length - 1 ? '' : ' disabled'} aria-label="Đưa xuống">↓</button><button type="button" class="btn d s" data-a="cimdel" data-p="${i}">Xóa ảnh</button></div></div></div>`).join('')}</div>`;
+}
+let colFormNote = () => '';
 
 function colForm(c) {
   const d = c || { title: '', cat: CATS[0][0], active: true };
-  return `<h3>${c ? 'Sửa' : 'Thêm'} bộ sưu tập</h3><div class="fld"><label for="c_t">Tên bộ sưu tập</label><input id="c_t" value="${esc(d.title)}" maxlength="80"></div><div class="fld"><label for="c_c">Danh mục khi bấm vào</label><select id="c_c">${CATS.map(x => `<option value="${x[0]}"${d.cat === x[0] ? ' selected' : ''}>${x[1]}</option>`).join('')}</select></div><div class="fld"><label>Ảnh bộ sưu tập</label><div id="c_prev">${colPrevHtml()}</div><input id="c_f" type="file" accept="image/*"><div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="c_u" placeholder="Hoặc dán đường dẫn ảnh"><button type="button" class="btn s o" data-a="colurl">Thêm</button></div></div><label class="row" style="margin-bottom:10px"><input id="c_a" type="checkbox" style="width:auto"${d.active ? ' checked' : ''}> Hiển thị trên trang chủ</label><div class="err" id="c_e"></div><div class="row"><button class="btn" data-a="colsv">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
+  return `<h3>${c ? 'Sửa' : 'Thêm'} bộ sưu tập</h3><div class="fld"><label for="c_t">Tên bộ sưu tập</label><input id="c_t" value="${esc(d.title)}" maxlength="80"></div><div class="fld"><label for="c_c">Danh mục (sản phẩm hiển thị trong bộ sưu tập)</label><select id="c_c">${CATS.map(x => `<option value="${x[0]}"${d.cat === x[0] ? ' selected' : ''}>${x[1]}</option>`).join('')}</select></div><div class="fld"><label>Ảnh minh họa và mô tả cho từng ảnh (tối đa 12 ảnh)</label>${colFormNote()}<div id="c_imgs">${colImgsHtml()}</div><input id="c_f" type="file" accept="image/*" multiple><div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="c_u" placeholder="Hoặc dán đường dẫn ảnh"><button type="button" class="btn s o" data-a="colurl">Thêm</button></div></div><label class="row" style="margin-bottom:10px"><input id="c_a" type="checkbox" style="width:auto"${d.active ? ' checked' : ''}> Hiển thị trên trang chủ</label><div class="err" id="c_e"></div><div class="row"><button class="btn" data-a="colsv">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
 }
 
-function renderColPrev() {
-  const e = $('#c_prev');
-  if (e) e.innerHTML = colPrevHtml();
+function renderColImgs() {
+  const e = $('#c_imgs');
+  if (e) e.innerHTML = colImgsHtml();
 }
 
-async function addColFile(f) {
-  if (!f) return;
+async function addColFiles(files) {
+  const room = 12 - S.cimgs.length;
+  if (room <= 0) return toast('Tối đa 12 ảnh cho mỗi bộ sưu tập');
+  syncCaps();
   toast('Đang xử lý ảnh…');
-  try {
-    S.cimg = await storeImage(await fileToDataUrl(f, 1200));
-    renderColPrev();
-  } catch (e) {
-    toast(e.message);
+  for (const f of files.slice(0, room)) {
+    try {
+      S.cimgs.push({ url: await storeImage(await fileToDataUrl(f, 1200)), caption: '' });
+      renderColImgs();
+    } catch (e) {
+      toast(e.message);
+    }
   }
 }
 
@@ -1032,7 +1061,7 @@ function renderSug() {
 
 function setNav() {
   const k =
-    S.view === 'home'
+    S.view === 'home' || S.view === 'col'
       ? 'home'
       : S.view === 'products'
         ? S.f.cat === 'sale'
@@ -1083,7 +1112,7 @@ function go(v, a = null) {
 
 let lastViewKey = '';
 function animateView() {
-  const k = S.view + (S.view === 'admin' ? ':' + S.adm : '') + (S.view === 'detail' || S.view === 'auth' ? ':' + S.arg : '');
+  const k = S.view + (S.view === 'admin' ? ':' + S.adm : '') + (S.view === 'detail' || S.view === 'auth' || S.view === 'col' ? ':' + S.arg : '');
   if (k === lastViewKey) return;
   lastViewKey = k;
   const m = $('#main');
@@ -1103,7 +1132,8 @@ function render() {
     profile,
     orders: ordersV,
     wish: wishV,
-    admin
+    admin,
+    col: colView
   };
   if (['profile', 'orders', 'checkout'].includes(S.view) && !user()) {
     S.after = S.view;
@@ -1494,20 +1524,17 @@ Object.assign(A, {
   coledit: p => {
     const c = +p ? getCols().find(x => x.id == p) : null;
     S.cid = c ? c.id : 0;
-    S.cimg = c ? c.image : '';
+    S.cimgs = c ? colPics(c).map(m => ({ url: m.url, caption: m.caption || '' })) : [];
     modal(colForm(c));
   },
   colsv: async () => {
     const t = $('#c_t').value.trim(),
       e = $('#c_e');
     if (t.length < 2) return (e.textContent = 'Vui lòng nhập tên bộ sưu tập');
+    syncCaps();
+    const images = S.cimgs.filter(m => m.url).map(m => ({ url: m.url, caption: m.caption || '' }));
     try {
-      await colSave(S.cid, {
-        title: t,
-        cat: $('#c_c').value,
-        image: S.cimg || '',
-        active: $('#c_a').checked
-      });
+      await colSave(S.cid, { title: t, cat: $('#c_c').value, image: images[0] ? images[0].url : '', images, active: $('#c_a').checked });
       modal('');
       render();
       toast('Đã lưu bộ sưu tập');
@@ -1534,7 +1561,7 @@ Object.assign(A, {
   coltog: async p => {
     const c = getCols().find(x => x.id == p);
     try {
-      await colSave(c.id, { title: c.title, cat: c.cat, image: c.image, active: !c.active });
+      await colSave(c.id, { title: c.title, cat: c.cat, image: c.image, images: c.images || [], active: !c.active });
       render();
     } catch (e) {
       toast(e.message);
@@ -1554,13 +1581,40 @@ Object.assign(A, {
     const i = $('#c_u'),
       u = i.value.trim();
     if (!/^(https?:\/\/|\/?images\/|\/uploads\/|\/api\/uploads\/)\S+$/.test(u)) return toast('Đường dẫn ảnh không hợp lệ');
-    S.cimg = u;
+    if (S.cimgs.length >= 12) return toast('Tối đa 12 ảnh cho mỗi bộ sưu tập');
+    syncCaps();
+    S.cimgs.push({ url: u, caption: '' });
     i.value = '';
-    renderColPrev();
+    renderColImgs();
   },
-  colclr: () => {
-    S.cimg = '';
-    renderColPrev();
+  cimup: p => {
+    syncCaps();
+    const i = +p;
+    if (i > 0) [S.cimgs[i - 1], S.cimgs[i]] = [S.cimgs[i], S.cimgs[i - 1]];
+    renderColImgs();
+  },
+  cimdn: p => {
+    syncCaps();
+    const i = +p;
+    if (i < S.cimgs.length - 1) [S.cimgs[i + 1], S.cimgs[i]] = [S.cimgs[i], S.cimgs[i + 1]];
+    renderColImgs();
+  },
+  cimdel: p => {
+    syncCaps();
+    S.cimgs.splice(+p, 1);
+    renderColImgs();
+  },
+  colv: p => go('col', p),
+  lbopen: p => {
+    const c = getCols().find(x => x.id == S.arg);
+    S.lb = +p;
+    modal(lbHtml(c, S.lb));
+  },
+  lbgo: p => {
+    const c = getCols().find(x => x.id == S.arg),
+      n = colPics(c).length;
+    S.lb = (S.lb + +p + n) % n;
+    modal(lbHtml(c, S.lb));
   },
   coldef: async () => {
     try {
@@ -1591,7 +1645,7 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.id === 'c_f') {
-    addColFile(t.files[0]);
+    addColFiles([...t.files]);
     t.value = '';
     return;
   }

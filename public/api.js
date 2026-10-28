@@ -25,6 +25,7 @@
   let TOKEN = '';
   let SERVER_COLS = false;
   let ADMIN_P = false;
+  let COL_IMGS = null;
   let VM = {};
   try {
     TOKEN = localStorage.getItem('mono-token') || '';
@@ -131,7 +132,8 @@
     cat: c.categorySlug,
     image: abs(c.imageUrl || ''),
     active: c.isActive,
-    pos: c.position
+    pos: c.position,
+    images: ((COL_IMGS = Array.isArray(c.images)), (c.images || []).map(m => ({ url: abs(m.url), caption: m.caption || '' })))
   });
   const mapReview = r => ({ u: r.user.name, uid: r.userId, r: r.rating, c: r.comment, d: Date.parse(r.createdAt) });
 
@@ -640,8 +642,20 @@
       const l = getCols(),
         cur = id ? l.find(c => c.id == id) : null;
       const pos = cur && cur.pos != null ? cur.pos : Math.max(0, ...l.map(c => c.pos || 0)) + 1;
-      const body = { title: d.title, categorySlug: d.cat, imageUrl: d.image ? rel(d.image) : null, isActive: d.active, position: pos };
-      await rq(id ? '/admin/collections/' + id : '/admin/collections', { method: id ? 'PUT' : 'POST', body });
+      const pics = d.images && d.images.length ? d.images : d.image ? [{ url: d.image, caption: '' }] : [];
+      const body = {
+        title: d.title,
+        categorySlug: d.cat,
+        imageUrl: pics[0] ? rel(pics[0].url) : null,
+        isActive: d.active,
+        position: pos,
+        ...(COL_IMGS !== false && { images: pics.map(m => ({ url: rel(m.url), caption: m.caption || '' })) })
+      };
+      const saved = await rq(id ? '/admin/collections/' + id : '/admin/collections', { method: id ? 'PUT' : 'POST', body });
+      if (pics.length > 1 && !Array.isArray(saved && saved.images)) {
+        COL_IMGS = false;
+        toast('Máy chủ chưa hỗ trợ nhiều ảnh cho bộ sưu tập: chỉ lưu ảnh bìa. Hãy cập nhật backend.');
+      }
       await refreshCols();
     };
     colRemove = async id => {
@@ -672,6 +686,10 @@
       }
       await refreshCols();
     };
+    colFormNote = () =>
+      COL_IMGS === false
+        ? '<p class="err" style="min-height:0;margin:0 0 6px">Máy chủ chưa hỗ trợ nhiều ảnh cho bộ sưu tập: chỉ ảnh đầu tiên được lưu. Cập nhật backend để dùng đủ tính năng.</p>'
+        : '';
     acol = function () {
       const note = SERVER_COLS
         ? ''
