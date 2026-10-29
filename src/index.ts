@@ -11,6 +11,7 @@ import collections from "./routes/collections.js";
 import orders from "./routes/orders.js";
 import products from "./routes/products.js";
 import uploads from "./routes/uploads.js";
+import tryOn from "./routes/tryOn.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
@@ -26,6 +27,7 @@ app.use("/api/orders", orders);
 app.use("/api/collections", collections);
 app.use("/api/uploads", uploads);
 app.use("/api/admin", admin);
+app.use("/api/try-on", tryOn);
 app.use("/images", express.static(path.join(root, "images")));
 app.use(express.static(path.join(root, "public")));
 app.use(errorHandler);
