@@ -36,7 +36,13 @@ const CONFIG = {
     { cat: 'pk', title: 'Phụ kiện điểm nhấn', image: '' }
   ],
   /* Ảnh thẻ danh mục ở trang chủ; để '' dùng ảnh minh họa. */
-  categoryImages: { ao: '', quan: '', vay: '', khoac: '', pk: '' }
+  categoryImages: {
+    ao: 'images/categories/ao.jpg',
+    quan: 'images/categories/quan.jpg',
+    vay: 'images/categories/vay.jpg',
+    khoac: 'images/categories/ao-khoac.jpg',
+    pk: 'images/categories/phu-kien.jpg'
+}
 };
 
 /* ==========================================================================
