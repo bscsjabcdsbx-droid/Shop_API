@@ -35,6 +35,7 @@ model User {
   reviews      Review[]
   wishlist     Wishlist[]
   chatMessages ChatMessage[]
+  tryOnJobs    TryOnJob[]
 }
 
 model Category {
@@ -62,6 +63,9 @@ model Product {
   variants    ProductVariant[]
   reviews     Review[]
   wishlist    Wishlist[]
+  // Loại trang phục khi thử đồ AI: upper | lower | overall | none. null = tự suy theo danh mục.
+  tryOnType   String?
+  tryOnJobs   TryOnJob[]
   @@index([categoryId])
 }
 
@@ -246,4 +250,40 @@ model ChatMessage {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, id])
+}
+
+// ===== Thử đồ AI (CatVTON) =====
+// Chỉ lưu metadata. Ảnh người dùng và ảnh kết quả KHÔNG BAO GIỜ được lưu vào database.
+enum TryOnStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model TryOnJob {
+  id                String      @id @default(uuid())
+  userId            Int
+  productId         Int
+  garmentType       String
+  status            TryOnStatus @default(QUEUED)
+  idempotencyKey    String
+  // false khi lỗi do hệ thống (máy AI tắt, hàng đợi đầy...) -> không trừ lượt của người dùng
+  countsTowardQuota Boolean     @default(true)
+  errorCode         String?
+  queuePosition     Int?
+  submittedAt       DateTime?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  resultFetchedAt   DateTime?
+  resultReleased    Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }

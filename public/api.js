@@ -15,9 +15,18 @@
    1. CẤU HÌNH & TOKEN
    ========================================================================== */
   const API_HOST = 'shop-api-1-gvf9.onrender.com';
+
+  const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+
   const API =
     window.MONO_API ||
-    (location.port === '4000' || location.hostname === API_HOST ? '/api' : 'https://' + API_HOST + '/api');
+    (
+      location.port === '4000' || location.hostname === API_HOST
+        ? '/api'
+        : IS_LOCAL
+          ? 'http://localhost:4000/api'
+          : 'https://' + API_HOST + '/api'
+    );
   const ORIGIN = API.replace(/\/api$/, '');
   const ENUM = ['PENDING', 'CONFIRMED', 'PREPARING', 'SHIPPING', 'DELIVERED', 'CANCELLED'];
   const SZ = ['S', 'M', 'L', 'XL', 'FREE'];
@@ -36,6 +45,8 @@
       t ? localStorage.setItem('mono-token', t) : localStorage.removeItem('mono-token');
     } catch (e) {}
   };
+  // Thông tin cho tryon.js: chỉ địa chỉ API của cửa hàng và token đăng nhập (không có khóa máy AI).
+  window.MONO_TRYON = { api: API, token: () => TOKEN, online: false };
   const isAdmin = () => {
     const u = user();
     return !!u && u.role === 'admin';
@@ -99,6 +110,7 @@
       date: Date.parse(s.createdAt),
       rating: s.rating || 0,
       images: (s.images || []).map(i => abs(i.url)),
+      tryOnType: s.tryOnType || null,
       active: s.isActive !== false
     };
   };
@@ -571,6 +583,7 @@
         categoryId: CATIDS[g('m_c')],
         isActive: true,
         images: (S.pimgs || []).map(rel),
+        ...($('#m_t') ? { tryOnType: $('#m_t').value || null } : {}),
         variants
       };
       try {
@@ -822,6 +835,8 @@
     } catch (e) {}
     db = { v: 1, session: null, users: [], products: [], orders: [], carts: {}, wish, reviews: {}, coupons: [], chats: {} };
     install();
+    window.MONO_TRYON.online = true;
+    if (window.TryOn) window.TryOn.loadCfg();
     await Promise.all([loadProducts(), loadCats(), loadCols()]);
     if (TOKEN) {
       try {

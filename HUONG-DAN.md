@@ -59,6 +59,10 @@ Gửi token trong header `Authorization: Bearer <token>`. Token nhận được 
 | | GET, POST /api/admin/products ; PUT, DELETE /api/admin/products/:id ; PATCH /api/admin/variants/:id/stock | admin |
 | | GET /api/admin/orders ; PATCH /api/admin/orders/:id/status | admin |
 | | GET /api/admin/customers ; GET /api/admin/customers/:id/orders ; PATCH /api/admin/customers/:id/active | admin |
+| Thử đồ AI | GET /api/try-on/config | công khai |
+| | GET /api/try-on/active ; POST /api/try-on ; GET /api/try-on/:jobId/status ; GET /api/try-on/:jobId/result ; DELETE /api/try-on/:jobId | đăng nhập (chủ job) |
+
+Cài đặt và vận hành tính năng thử đồ AI: xem `CATVTON_INTEGRATION.md`.
 
 Thử nhanh bằng curl:
 ```

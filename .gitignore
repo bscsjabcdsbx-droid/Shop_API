@@ -4,3 +4,9 @@ node_modules/
 !.env.example
 dist
 public/uploads
+# Local temporary files
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

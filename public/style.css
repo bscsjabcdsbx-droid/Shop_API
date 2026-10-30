@@ -554,3 +554,23 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
 @media (prefers-reduced-motion: reduce) {
   .chatfab { transition: none; }
 }
+/* Thử đồ AI (tryon.js) */
+.to-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.to-h h3 { margin: 0; }
+.tosm { font-size: 13px; margin: 6px 0; }
+.to-drop { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 220px; margin: 10px 0;
+  border: 1.5px dashed var(--line); border-radius: 12px; background: var(--bg2); cursor: pointer; overflow: hidden; }
+.to-drop:hover, .to-drop:focus-within { border-color: var(--acc); }
+.to-drop.has { border-style: solid; background: none; }
+.to-drop img { max-width: 100%; max-height: 50vh; display: block; }
+.to-res { margin: 10px 0; text-align: center; }
+.to-res img { max-width: 100%; max-height: 60vh; border-radius: 12px; border: 1px solid var(--line); }
+.to-wait { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 28px 8px; }
+.to-spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--acc); animation: to-rot 1s linear infinite; }
+@keyframes to-rot { to { transform: rotate(360deg); } }
+.to-msg { border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 14px; border: 1px solid var(--line); }
+.to-msg.bad { border-color: var(--bad); color: var(--bad); }
+.to-msg.warn { border-color: var(--acc); }
+.to-msg.ok { border-color: var(--ok); color: var(--ok); }
+@media (prefers-reduced-motion: reduce) { .to-spin { animation-duration: 3s; } }
+.to a.btn { text-decoration: none; }

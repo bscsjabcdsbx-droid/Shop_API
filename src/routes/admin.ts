@@ -23,7 +23,10 @@ const imageRef = z.string().min(1).max(2000).refine(u => /^(https?:\/\/|\/)/.tes
 const productSchema = z.object({
   name: z.string().min(2), slug: z.string().regex(/^[a-z0-9-]+$/), description: z.string().min(1), material: z.string().optional(),
   price: z.number().int().min(0), salePrice: z.number().int().min(0).nullable().optional(), categoryId: z.number().int(), isActive: z.boolean().default(true),
-  images: z.array(imageRef).max(8), variants: z.array(z.object({ size: z.string(), color: z.string(), stock: z.number().int().min(0) })).min(1),
+  images: z.array(imageRef).max(8),
+  // Thử đồ AI: null = tự suy theo danh mục; "none" = tắt cho sản phẩm này. Không gửi = giữ nguyên.
+  tryOnType: z.enum(["upper", "lower", "overall", "none"]).nullable().optional(),
+  variants: z.array(z.object({ size: z.string(), color: z.string(), stock: z.number().int().min(0) })).min(1),
 }).refine(p => p.salePrice == null || p.salePrice < p.price, { message: "Giá khuyến mãi phải thấp hơn giá gốc" });
 
 r.get("/products", wrap(async (req, res) => {
