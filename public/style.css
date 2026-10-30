@@ -17,8 +17,11 @@
   14. Trang quản trị (admin): tab, thống kê, biểu đồ, cửa sổ sửa
   15. Footer
   16. Thông báo (toast) & trạng thái rỗng
-  17. Hiệu ứng chuyển trang & tab
-  18. Responsive: máy tính bảng & điện thoại
+  17. Chat trực tiếp (khách và admin)
+  18. Mã giảm giá & giỏ hàng
+  19. Thanh điều hướng dưới & tối ưu theo thiết bị
+  20. Hiệu ứng chuyển trang & tab
+  21. Responsive: máy tính bảng & điện thoại
    ========================================================================== */
 
 
@@ -66,7 +69,7 @@ mark { background: none; color: var(--acc); font-weight: 700; }
 /* ==========================================================================
    3. BỐ CỤC CHUNG
    ========================================================================== */
-.wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px; }
 .row  { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px; }
 .box  { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--card); }
@@ -372,7 +375,81 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
 
 
 /* ==========================================================================
-  17. HIỆU ỨNG CHUYỂN TRANG & TAB
+  17. CHAT TRỰC TIẾP (khách và admin)
+   ========================================================================== */
+.chatfab {
+  position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 70;
+  width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--acc); color: #fff; cursor: pointer;
+  display: grid; place-items: center; box-shadow: 0 8px 24px #0004; transition: transform .2s ease;
+}
+.chatfab:hover { transform: scale(1.07); }
+.chatfab svg { width: 26px; height: 26px; }
+.chatfab .cnt { top: -2px; right: -2px; background: var(--bad); }
+.chatbox {
+  position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 75;
+  width: 360px; height: min(520px, calc(100vh - 120px)); display: flex; flex-direction: column;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 48px #0004; overflow: hidden;
+}
+.chatbox[hidden] { display: none; }
+.chhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+.chhead > div { display: flex; flex-direction: column; min-width: 0; }
+.chbody { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.center { text-align: center; }
+.chbody.center { align-items: center; justify-content: center; }
+.cmsg { display: flex; flex-direction: column; max-width: 82%; }
+.cmsg.me { align-self: flex-end; align-items: flex-end; }
+.cmsg.them { align-self: flex-start; align-items: flex-start; }
+.cbub { padding: 9px 12px; border-radius: 14px; word-break: break-word; line-height: 1.4; }
+.cmsg.me .cbub { background: var(--acc); color: #fff; border-bottom-right-radius: 4px; }
+.cmsg.them .cbub { background: var(--bg2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.ctime { font-size: 11px; color: var(--mut); margin-top: 2px; }
+.chform { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); align-items: flex-end; }
+.chform textarea { resize: none; max-height: 90px; flex: 1; }
+.cnt2 { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; text-align: center; font-weight: 700; }
+
+/* Tab Tin nhắn của admin: danh sách khách bên trái, hội thoại bên phải */
+.achat { display: grid; grid-template-columns: 300px 1fr; gap: 14px; height: min(620px, calc(100vh - 220px)); min-height: 380px; }
+.athreads { overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.cthr { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 12px; cursor: pointer; }
+.cthr:hover, .cthr.on { background: var(--bg2); }
+.ctl { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.apane { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.chback { display: none; }
+
+
+/* ==========================================================================
+  18. MÃ GIẢM GIÁ & GIỎ HÀNG
+   ========================================================================== */
+.cpbox { margin: 10px 0; }
+.cpbox.ok { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed var(--ok); border-radius: 10px; }
+.clist { display: grid; gap: 10px; }
+.citem { display: grid; grid-template-columns: 76px 1fr auto 100px auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.citem img { width: 76px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; }
+.cinfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cqty { display: flex; align-items: center; gap: 8px; }
+.ctot { text-align: right; }
+.sticky { position: sticky; top: 72px; }
+
+
+/* ==========================================================================
+  19. THANH ĐIỀU HƯỚNG DƯỚI & TỐI ƯU THEO THIẾT BỊ
+   ========================================================================== */
+.bnav { display: none; }
+.avatar.sm { width: 24px; height: 24px; font-size: 12px; }
+@media (min-width: 1100px) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 22px; }
+  .hero { padding: 48px 0; }
+  .det > div:first-child { position: sticky; top: 76px; align-self: start; }
+}
+@media (pointer: coarse) {
+  .btn.s { min-height: 40px; }
+  .chip { min-height: 42px; }
+  .ib { min-width: 44px; min-height: 44px; }
+}
+
+
+/* ==========================================================================
+  20. HIỆU ỨNG CHUYỂN TRANG & TAB
    (nội dung trượt nhẹ lên khi đổi trang hoặc đổi tab admin; gạch chân thanh
     điều hướng trượt ra; cửa sổ bật lên; tắt hết khi người dùng chọn giảm chuyển động)
    ========================================================================== */
@@ -390,7 +467,7 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
 
 
 /* ==========================================================================
-  18. RESPONSIVE
+  21. RESPONSIVE
    ========================================================================== */
 @media (min-width: 861px) {
   .mo { display: none; }
@@ -427,4 +504,53 @@ footer { margin-top: 60px; border-top: 1px solid var(--line); background: var(--
   /* Bộ lọc thành ngăn kéo toàn màn hình */
   .side { display: none; }
   .side.open { display: block; position: fixed; inset: 0; background: var(--bg); z-index: 60; padding: 20px; overflow: auto; }
+}
+
+@media (max-width: 760px) {
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .burger, #nav, .hm { display: none !important; }
+  .bnav {
+    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    background: var(--bg); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .bnav button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 58px; background: none; border: 0; color: var(--mut); font-size: 11px; cursor: pointer; }
+  .bnav button.on { color: var(--acc); font-weight: 700; }
+  .bnav svg { width: 22px; height: 22px; }
+  .bnav .cnt { top: 4px; right: calc(50% - 24px); }
+  input, select, textarea { font-size: 16px; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -16px; margin-right: -16px; padding: 0 16px; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs .chip { flex: none; }
+  .tw table { min-width: 640px; }
+  .det .row .btn { flex: 1; }
+  .sticky { position: static; }
+  #toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Chat: nút nổi nằm trên thanh điều hướng dưới, khung chat chiếm toàn màn hình */
+  .chatfab { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); right: 14px; width: 50px; height: 50px; }
+  body.chat-open .chatfab { display: none; }
+  .chatbox { inset: 0; width: auto; height: auto; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top, 0px); }
+  .chform { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .achat { grid-template-columns: 1fr; height: calc(100vh - 240px); }
+  .achat .apane { display: none; }
+  .achat.open .athreads { display: none; }
+  .achat.open .apane { display: flex; }
+  .chback { display: inline-flex; }
+
+  /* Giỏ hàng gọn hơn */
+  .citem { grid-template-columns: 64px 1fr auto; grid-template-areas: "img info del" "img qty tot"; gap: 8px 12px; }
+  .citem img { grid-area: img; width: 64px; }
+  .cinfo { grid-area: info; }
+  .cqty { grid-area: qty; }
+  .ctot { grid-area: tot; }
+  .cdelb { grid-area: del; }
+}
+@media (max-width: 640px) {
+  /* Cửa sổ bật lên dạng ngăn kéo từ dưới lên */
+  .ov { align-items: flex-end; padding: 0; }
+  .md { max-width: none; border-radius: 16px 16px 0 0; max-height: 92vh; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .md:has(.lb) { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatfab { transition: none; }
 }

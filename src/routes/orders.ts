@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
+import { applyCoupon, attachCoupons, releaseCoupon } from "../coupon.js";
 import { db, HttpError, requireAuth, uid, wrap } from "../lib.js";
 
 const r = Router();
@@ -11,6 +12,7 @@ const checkoutSchema = z.object({
   fullName: z.string().min(2), phone: z.string().regex(/^0\d{9}$/, "Số điện thoại không hợp lệ"), email: z.string().email(),
   line: z.string().min(3), province: z.string().min(1), district: z.string().min(1), ward: z.string().min(1),
   note: z.string().max(500).optional(), paymentMethod: z.enum(["COD"]).default("COD"),
+  couponCode: z.string().trim().max(40).optional(),
 });
 
 r.post("/", wrap(async (req, res) => {
@@ -29,34 +31,45 @@ r.post("/", wrap(async (req, res) => {
       if (upd.count === 0) throw new HttpError(409, `"${l.name}" (${l.size}/${l.color}) không đủ hàng`);
       await tx.product.update({ where: { id: l.productId }, data: { soldCount: { increment: l.quantity } } });
     }
+    let discount = 0, couponId: number | null = null, couponCode: string | null = null;
+    if (d.couponCode) {
+      const c = await applyCoupon(tx, d.couponCode, subtotal, uid(req));
+      discount = c.discount; couponId = c.id; couponCode = c.code;
+    }
     const shippingFee = subtotal >= FREE_SHIP_FROM ? 0 : SHIP_FEE;
     const created = await tx.order.create({ data: {
       code: `DH${Date.now().toString(36).toUpperCase()}${randomBytes(2).toString("hex").toUpperCase()}`,
       userId: uid(req), paymentMethod: d.paymentMethod, shipName: d.fullName, shipPhone: d.phone, shipEmail: d.email,
-      shipAddress: `${d.line}, ${d.ward}, ${d.district}, ${d.province}`, note: d.note, subtotal, shippingFee, total: subtotal + shippingFee,
+      shipAddress: `${d.line}, ${d.ward}, ${d.district}, ${d.province}`, note: d.note, subtotal, shippingFee, total: subtotal - discount + shippingFee,
       items: { create: lines.map(({ productId, ...l }) => l) } }, include: { items: true } });
+    if (couponId !== null) await tx.couponUse.create({ data: { couponId, orderId: created.id, userId: uid(req), discount } });
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    return created;
+    return { ...created, discount, couponCode };
   });
   res.status(201).json(order);
 }));
 
-r.get("/", wrap(async (req, res) => res.json(await db.order.findMany({ where: { userId: uid(req) }, orderBy: { createdAt: "desc" }, include: { items: true } }))));
+r.get("/", wrap(async (req, res) => {
+  const list = await db.order.findMany({ where: { userId: uid(req) }, orderBy: { createdAt: "desc" }, include: { items: true } });
+  res.json(await attachCoupons(list));
+}));
 
 r.get("/:code", wrap(async (req, res) => {
   const o = await db.order.findFirst({ where: { code: req.params.code, userId: uid(req) }, include: { items: true } });
   if (!o) throw new HttpError(404, "Không tìm thấy đơn hàng");
-  res.json(o);
+  res.json((await attachCoupons([o]))[0]);
 }));
 
 r.post("/:code/cancel", wrap(async (req, res) => {
-  await db.$transaction(async tx => {
+  const cancelledId = await db.$transaction(async tx => {
     const o = await tx.order.findFirst({ where: { code: req.params.code, userId: uid(req) }, include: { items: true } });
     if (!o) throw new HttpError(404, "Không tìm thấy đơn hàng");
     if (o.status !== "PENDING") throw new HttpError(409, "Chỉ hủy được đơn đang chờ xác nhận");
     await tx.order.update({ where: { id: o.id }, data: { status: "CANCELLED" } });
     for (const i of o.items) if (i.variantId !== null) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
+    return o.id;
   });
+  await releaseCoupon(cancelledId);
   res.json({ ok: true });
 }));
 export default r;

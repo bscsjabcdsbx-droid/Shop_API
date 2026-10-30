@@ -15,7 +15,9 @@
    12. TÌM KIẾM, GỢI Ý & HEADER
    13. ĐIỀU HƯỚNG & VẼ TRANG
    14. XỬ LÝ SỰ KIỆN (nút bấm, form, bàn phím)
-   15. KHỞI ĐỘNG
+   15. MÃ GIẢM GIÁ (khách nhập khi thanh toán, admin tạo và quản lý)
+   16. CHAT TRỰC TIẾP (khách với admin, polling)
+   17. KHỞI ĐỘNG
    ========================================================================== */
 
 /* ==========================================================================
@@ -353,7 +355,7 @@ const pwf = (id, extra = '') =>
 const stB = s => `<span class="badge${s === 4 ? ' c4' : s === 5 ? ' c5' : ''}">${STAT[s]}</span>`;
 
 function ordTbl(o, rev) {
-  return `<div class="box" style="margin:8px 0"><p><b>Mã đơn:</b> ${o.id} · ${new Date(o.date).toLocaleDateString('vi-VN')} · ${stB(o.status)}</p>${o.items.map(i => `<p class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(i.name)} (${i.size}/${i.color}) ×${i.qty}</span><span>${vnd(i.price * i.qty)}${rev && o.status === 4 && i.pid ? ` <button class="btn o s" data-a="rvgo" data-p="${i.pid}">Đánh giá</button>` : ''}</span></p>`).join('')}<p class="mut">Giao đến: ${esc(o.name)} · ${esc(o.phone)} · ${esc(o.addr)}<br>Thanh toán: ${o.pay}</p><p><b>Tổng: ${vnd(o.total)}</b> <span class="mut">(phí giao ${o.ship ? vnd(o.ship) : '0₫'})</span></p></div>`;
+  return `<div class="box" style="margin:8px 0"><p><b>Mã đơn:</b> ${o.id} · ${new Date(o.date).toLocaleDateString('vi-VN')} · ${stB(o.status)}</p>${o.items.map(i => `<p class="row" style="justify-content:space-between;margin:4px 0"><span>${esc(i.name)} (${i.size}/${i.color}) ×${i.qty}</span><span>${vnd(i.price * i.qty)}${rev && o.status === 4 && i.pid ? ` <button class="btn o s" data-a="rvgo" data-p="${i.pid}">Đánh giá</button>` : ''}</span></p>`).join('')}<p class="mut">Giao đến: ${esc(o.name)} · ${esc(o.phone)} · ${esc(o.addr)}<br>Thanh toán: ${o.pay}</p>${(o.disc || 0) ? `<p class="mut">Mã giảm giá ${esc(o.coupon || '')}: −${vnd(o.disc)}</p>` : ''}<p><b>Tổng: ${vnd(o.total)}</b> <span class="mut">(phí giao ${o.ship ? vnd(o.ship) : '0₫'})</span></p></div>`;
 }
 
 function modal(h) {
@@ -611,15 +613,16 @@ function totals() {
   const l = lines(),
     sub = l.reduce((s, x) => s + x.tot, 0),
     ship = !sub ? 0 : sub >= 5e5 ? 0 : S.fast ? 5e4 : 3e4;
-  return { l, sub, ship, total: sub + ship };
+  const cc = couponCalc(S.coupon, sub);
+  return { l, sub, ship, disc: cc.discount, cmsg: cc.msg || '', total: sub - cc.discount + ship };
 }
 
 function cartV() {
   const t = totals();
   if (!t.l.length)
     return '<div class="empty"><h2>Giỏ hàng trống</h2><p>Hãy chọn vài món bạn thích.</p><button class="btn" data-a="go" data-p="products">Tiếp tục mua sắm</button></div>';
-  return `<h1 style="margin-top:20px">Giỏ hàng</h1><div class="two"><div class="tw"><table><tr><th>Sản phẩm</th><th>Giá</th><th>SL</th><th>Tổng</th><th></th></tr>${t.l.map((x, i) => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(x.p)}" alt="${esc(x.p.name)}" style="width:56px;border-radius:8px"><div><b>${esc(x.p.name)}</b><br><span class="mut">${x.size} · ${x.color}</span></div></div></td><td>${vnd(pp(x.p))}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-a="cq" data-p="${i}:-1">−</button>${x.qty}<button class="btn o s" data-a="cq" data-p="${i}:1">+</button></div></td><td>${vnd(x.tot)}</td><td><button class="ib" data-a="cdel" data-p="${i}" aria-label="Xóa">✕</button></td></tr>`).join('')}</table></div>
- <div class="box"><h3>Tóm tắt</h3><p class="row" style="justify-content:space-between">Tạm tính<b>${vnd(t.sub)}</b></p><p class="row" style="justify-content:space-between">Phí vận chuyển<b>${t.ship ? vnd(t.ship) : 'Miễn phí'}</b></p><p class="row" style="justify-content:space-between">Giảm giá<b>0₫</b></p><hr style="border:0;border-top:1px solid var(--line)"><p class="row" style="justify-content:space-between">Tổng cộng<b style="font-size:20px">${vnd(t.total)}</b></p><button class="btn" style="width:100%" data-a="checkout">Tiến hành thanh toán</button></div></div>`;
+  return `<h1 style="margin-top:20px">Giỏ hàng</h1><div class="two"><div class="clist">${t.l.map((x, i) => `<div class="citem"><img src="${esc(img(x.p))}" alt="${esc(x.p.name)}" loading="lazy" decoding="async"><div class="cinfo"><b>${esc(x.p.name)}</b><span class="mut">${x.size} · ${x.color}</span><span class="mut">${vnd(pp(x.p))}</span></div><div class="cqty"><button class="btn o s" data-a="cq" data-p="${i}:-1" aria-label="Giảm">−</button><b>${x.qty}</b><button class="btn o s" data-a="cq" data-p="${i}:1" aria-label="Tăng">+</button></div><b class="ctot">${vnd(x.tot)}</b><button class="ib cdelb" data-a="cdel" data-p="${i}" aria-label="Xóa">✕</button></div>`).join('')}</div>
+ <div class="box sticky"><h3>Tóm tắt</h3><p class="row" style="justify-content:space-between">Tạm tính<b>${vnd(t.sub)}</b></p><p class="row" style="justify-content:space-between">Phí vận chuyển<b>${t.ship ? vnd(t.ship) : 'Miễn phí'}</b></p><p class="row" style="justify-content:space-between">Giảm giá${S.coupon ? ' (' + esc(S.coupon.code) + ')' : ''}<b>${t.disc ? '−' + vnd(t.disc) : '0₫'}</b></p><hr style="border:0;border-top:1px solid var(--line)"><p class="row" style="justify-content:space-between">Tổng cộng<b style="font-size:20px">${vnd(t.total)}</b></p><button class="btn" style="width:100%" data-a="checkout">Tiến hành thanh toán</button></div></div>`;
 }
 
 function checkout() {
@@ -632,7 +635,7 @@ function checkout() {
   return `<h1 style="margin-top:20px">Thanh toán</h1><div class="two"><div><div class="box"><h3>1. Thông tin giao hàng</h3><div class="f2">${F('co_name', 'Họ tên', u.name)}${F('co_phone', 'Số điện thoại', u.phone, 'tel')}</div>${F('co_email', 'Email', u.email, 'email')}${F('co_addr', 'Địa chỉ')}<div class="f2">${F('co_prov', 'Tỉnh/thành phố')}${F('co_dist', 'Quận/huyện')}</div>${F('co_ward', 'Phường/xã')}<div class="fld"><label for="co_note">Ghi chú</label><textarea id="co_note" rows="2">${esc(c.co_note || '')}</textarea></div></div>
  <div class="box" style="margin-top:14px"><h3>2. Vận chuyển</h3><label><input type="radio" name="sh" style="width:auto" data-a="ship" data-p="0" ${S.fast ? '' : 'checked'}> Tiêu chuẩn (2–4 ngày) — ${t.sub >= 5e5 ? 'Miễn phí' : '30.000₫'}</label><br><label><input type="radio" name="sh" style="width:auto" data-a="ship" data-p="1" ${S.fast ? 'checked' : ''}> Nhanh (1–2 ngày) — ${t.sub >= 5e5 ? 'Miễn phí' : '50.000₫'}</label></div>
  <div class="box" style="margin-top:14px"><h3>3. Thanh toán</h3><label><input type="radio" checked style="width:auto"> Thanh toán khi nhận hàng (COD)</label><br><label class="mut"><input type="radio" disabled style="width:auto"> Thanh toán online (sắp có)</label></div></div>
- <div class="box"><h3>4. Xác nhận đơn hàng</h3>${t.l.map(x => `<p class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(x.p.name)} (${x.size}/${x.color}) ×${x.qty}</span><b>${vnd(x.tot)}</b></p>`).join('')}<hr style="border:0;border-top:1px solid var(--line)"><p class="row" style="justify-content:space-between">Tạm tính<b>${vnd(t.sub)}</b></p><p class="row" style="justify-content:space-between">Phí giao hàng<b>${t.ship ? vnd(t.ship) : 'Miễn phí'}</b></p><p class="row" style="justify-content:space-between">Tổng thanh toán<b style="font-size:20px">${vnd(t.total)}</b></p><button class="btn" id="place" style="width:100%" data-a="place" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Đang xử lý…' : 'Đặt hàng'}</button></div></div>`;
+ <div class="box sticky"><h3>4. Xác nhận đơn hàng</h3>${t.l.map(x => `<p class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(x.p.name)} (${x.size}/${x.color}) ×${x.qty}</span><b>${vnd(x.tot)}</b></p>`).join('')}${couponBox(t)}<hr style="border:0;border-top:1px solid var(--line)"><p class="row" style="justify-content:space-between">Tạm tính<b>${vnd(t.sub)}</b></p><p class="row" style="justify-content:space-between">Phí giao hàng<b>${t.ship ? vnd(t.ship) : 'Miễn phí'}</b></p>${t.disc ? `<p class="row" style="justify-content:space-between">Giảm giá (${esc(S.coupon.code)})<b style="color:var(--ok)">−${vnd(t.disc)}</b></p>` : ''}<p class="row" style="justify-content:space-between">Tổng thanh toán<b style="font-size:20px">${vnd(t.total)}</b></p><button class="btn" id="place" style="width:100%" data-a="place" ${S.busy ? 'disabled' : ''}>${S.busy ? 'Đang xử lý…' : 'Đặt hàng'}</button></div></div>`;
 }
 
 function addItem(pid, size, color, qty) {
@@ -677,6 +680,13 @@ function placeOrder() {
   if (r.includes(false)) return toast('Vui lòng kiểm tra lại thông tin giao hàng');
   const t = totals();
   for (const x of t.l) if (x.qty > x.max) return toast(`"${x.p.name}" (${x.size}/${x.color}) không đủ hàng`);
+  if (S.coupon) {
+    try {
+      localCouponCheck(S.coupon.code, t.sub);
+    } catch (x) {
+      return toast(x.message);
+    }
+  }
   S.busy = true;
   $('#place').disabled = true;
   $('#place').textContent = 'Đang xử lý…';
@@ -700,6 +710,8 @@ function placeOrder() {
       ship: t.ship,
       sub: t.sub,
       total: t.total,
+      disc: t.disc,
+      coupon: S.coupon ? S.coupon.code : '',
       items: t.l.map(x => ({
         pid: x.pid,
         name: x.p.name,
@@ -710,6 +722,11 @@ function placeOrder() {
       }))
     });
     db.carts[key()] = [];
+    if (S.coupon) {
+      const cp = getCoupons().find(c => c.code === S.coupon.code);
+      if (cp) cp.usedCount++;
+      S.coupon = null;
+    }
     save();
     S.busy = false;
     S.co = null;
@@ -774,11 +791,13 @@ function admin() {
     ['aprod', 'Sản phẩm'],
     ['acol', 'Bộ sưu tập'],
     ['aord', 'Đơn hàng'],
+    ['acp', 'Mã giảm giá'],
+    ['achat', 'Tin nhắn'],
     ['acus', 'Khách hàng']
   ];
   return (
-    `<div class="tabs">${tabs.map(t => `<button class="chip${S.adm === t[0] ? ' on' : ''}" data-a="atab" data-p="${t[0]}">${t[1]}</button>`).join('')}</div>` +
-    { dash: dash, aprod: aprod, aord: aord, acus: acus, acol: acol }[S.adm]()
+    `<div class="tabs">${tabs.map(t => `<button class="chip${S.adm === t[0] ? ' on' : ''}" data-a="atab" data-p="${t[0]}">${t[1]}${t[0] === 'achat' && CH.ad.unread ? ` <span class="cnt2">${CH.ad.unread}</span>` : ''}</button>`).join('')}</div>` +
+    { dash: dash, aprod: aprod, aord: aord, acus: acus, acol: acol, acp: acp, achat: achat }[S.adm]()
   );
 }
 
@@ -970,6 +989,10 @@ function setStatus(o, s) {
         p.sold = Math.max(0, p.sold - i.qty);
       }
     });
+  if (s === 5 && o.status !== 5 && o.coupon) {
+    const cp = getCoupons().find(c => c.code === o.coupon);
+    if (cp && cp.usedCount > 0) cp.usedCount--;
+  }
   o.status = s;
   if (s === 4) o.doneAt = Date.now();
   save();
@@ -1142,6 +1165,7 @@ function render() {
   }
   $('#main').innerHTML = (V[S.view] || home)();
   animateView();
+  chatUi();
   const n = cart().reduce((s, i) => s + i.qty, 0),
     c = $('#cc');
   c.hidden = !n;
@@ -1698,7 +1722,425 @@ $('#hs').addEventListener('input', renderSug);
 $('#hs').addEventListener('focus', renderSug);
 
 /* ==========================================================================
-  15. KHỞI ĐỘNG
+  15. MÃ GIẢM GIÁ (khách nhập khi thanh toán, admin tạo và quản lý)
+   ========================================================================== */
+function getCoupons() {
+  return (
+    db.coupons ||
+    (db.coupons = [
+      { id: 1, code: 'WELCOME10', description: 'Giảm 10% cho đơn từ 200.000₫ (tối đa 50.000₫)', type: 'PERCENT', value: 10, minOrder: 200000, maxDiscount: 50000, usageLimit: null, perUserLimit: 1, usedCount: 0, startsAt: null, expiresAt: null, isActive: true },
+      { id: 2, code: 'GIAM30K', description: 'Giảm 30.000₫ cho đơn từ 300.000₫', type: 'FIXED', value: 30000, minOrder: 300000, maxDiscount: null, usageLimit: 100, perUserLimit: null, usedCount: 0, startsAt: null, expiresAt: null, isActive: true },
+      { id: 3, code: 'NSHV20', description: 'Giảm 20% cho đơn từ 500.000₫ (tối đa 100.000₫)', type: 'PERCENT', value: 20, minOrder: 500000, maxDiscount: 100000, usageLimit: 50, perUserLimit: 1, usedCount: 0, startsAt: null, expiresAt: null, isActive: true }
+    ])
+  );
+}
+
+/* Số tiền được giảm cho một tạm tính (giống cách tính ở server) */
+function couponCalc(c, sub) {
+  if (!c || !sub) return { discount: 0 };
+  if (sub < (c.minOrder || 0)) return { discount: 0, msg: `Cần đơn tối thiểu ${vnd(c.minOrder)} để dùng mã này` };
+  const raw = c.type === 'PERCENT' ? Math.floor((sub * c.value) / 100) : c.value;
+  const capped = c.type === 'PERCENT' && c.maxDiscount ? Math.min(raw, c.maxDiscount) : raw;
+  return { discount: Math.max(0, Math.min(capped, sub)) };
+}
+
+/* Kiểm tra mã ở chế độ demo (dữ liệu trong trình duyệt) */
+function localCouponCheck(rawCode, sub) {
+  const code = String(rawCode).trim().toUpperCase(),
+    c = getCoupons().find(x => x.code === code),
+    now = Date.now();
+  if (!c) throw new Error('Mã giảm giá không tồn tại');
+  if (!c.isActive) throw new Error('Mã giảm giá đã bị tắt');
+  if (c.startsAt && new Date(c.startsAt) > now) throw new Error('Mã giảm giá chưa đến thời gian áp dụng');
+  if (c.expiresAt && new Date(c.expiresAt) < now) throw new Error('Mã giảm giá đã hết hạn');
+  if (c.usageLimit && c.usedCount >= c.usageLimit) throw new Error('Mã giảm giá đã hết lượt sử dụng');
+  if (sub < (c.minOrder || 0)) throw new Error(`Đơn hàng tối thiểu ${vnd(c.minOrder)} để dùng mã này`);
+  if (c.perUserLimit && db.orders.filter(o => o.uid === db.session && o.coupon === c.code && o.status !== 5).length >= c.perUserLimit)
+    throw new Error('Bạn đã dùng hết lượt của mã này');
+  return c;
+}
+
+/* Các hàm dưới là "cổng" dữ liệu: demo dùng trình duyệt, api.js ghi đè để gọi server */
+let couponCheck = async code => localCouponCheck(code, totals().sub);
+let cpSave = async (id, d) => {
+  const l = getCoupons();
+  if (l.some(c => c.code === d.code && c.id != id)) throw new Error('Mã giảm giá này đã tồn tại');
+  if (id) Object.assign(l.find(c => c.id == id), d);
+  else l.push({ id: Math.max(0, ...l.map(c => c.id)) + 1, usedCount: 0, ...d });
+  save();
+};
+let cpRemove = async id => {
+  db.coupons = getCoupons().filter(c => c.id != id);
+  save();
+};
+
+function couponBox(t) {
+  if (S.coupon)
+    return `<div class="cpbox ok"><div><b>${esc(S.coupon.code)}</b><br><span class="mut">${t.cmsg ? esc(t.cmsg) : t.disc ? 'Đang giảm ' + vnd(t.disc) : esc(S.coupon.description || '')}</span></div><button type="button" class="btn o s" data-a="cpclear">Bỏ mã</button></div>`;
+  return `<div class="cpbox"><div class="row" style="flex-wrap:nowrap"><input id="cp_code" placeholder="Nhập mã giảm giá" maxlength="40" autocomplete="off" style="text-transform:uppercase"><button type="button" class="btn o" data-a="cpapply">Áp dụng</button></div><div class="err" id="cp_msg"></div></div>`;
+}
+
+const toLocalInput = iso => {
+  if (!iso) return '';
+  const d = new Date(iso),
+    p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+function cpState(c) {
+  const n = Date.now();
+  if (!c.isActive) return ['Đang tắt', ''];
+  if (c.startsAt && new Date(c.startsAt) > n) return ['Chưa bắt đầu', ''];
+  if (c.expiresAt && new Date(c.expiresAt) < n) return ['Hết hạn', 'c5'];
+  if (c.usageLimit && c.usedCount >= c.usageLimit) return ['Hết lượt', 'c5'];
+  return ['Đang hoạt động', 'c4'];
+}
+
+function acp() {
+  const l = getCoupons(),
+    val = c => (c.type === 'PERCENT' ? c.value + '%' + (c.maxDiscount ? ' (tối đa ' + vnd(c.maxDiscount) + ')' : '') : vnd(c.value)),
+    day = v => (v ? new Date(v).toLocaleDateString('vi-VN') : '—');
+  return `<div class="row" style="margin-bottom:12px;justify-content:space-between"><span class="mut">Khách nhập mã ở bước thanh toán. Mã tự ngừng khi hết hạn hoặc hết lượt.</span><button class="btn" data-a="cpedit" data-p="0">+ Tạo mã giảm giá</button></div>
+  ${l.length ? `<div class="box tw"><table><tr><th>Mã</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Đã dùng</th><th>Hiệu lực</th><th>Trạng thái</th><th></th></tr>${l.map(c => { const st = cpState(c); return `<tr><td><b>${esc(c.code)}</b><br><span class="mut" style="font-size:12px">${esc(c.description || '')}</span></td><td>${val(c)}</td><td>${c.minOrder ? vnd(c.minOrder) : '—'}</td><td>${c.usedCount}${c.usageLimit ? ' / ' + c.usageLimit : ''}</td><td>${day(c.startsAt)} → ${day(c.expiresAt)}</td><td><span class="badge ${st[1]}">${st[0]}</span></td><td><div class="row" style="flex-wrap:nowrap"><button class="btn o s" data-a="cptog" data-p="${c.id}">${c.isActive ? 'Tắt' : 'Bật'}</button><button class="btn o s" data-a="cpedit" data-p="${c.id}">Sửa</button><button class="btn d s" data-a="cpdel" data-p="${c.id}">Xóa</button></div></td></tr>`; }).join('')}</table></div>` : '<div class="empty">Chưa có mã giảm giá nào.</div>'}`;
+}
+
+function cpForm(c) {
+  const d = c || { code: '', description: '', type: 'PERCENT', value: 10, minOrder: 0, isActive: true };
+  const num = v => (v == null ? '' : v);
+  return `<h3>${c ? 'Sửa' : 'Tạo'} mã giảm giá</h3><div class="f2"><div class="fld"><label for="cp_c">Mã (chữ, số, - hoặc _)</label><input id="cp_c" value="${esc(d.code)}" maxlength="30" style="text-transform:uppercase"></div><div class="fld"><label for="cp_t">Loại giảm</label><select id="cp_t"><option value="PERCENT"${d.type === 'PERCENT' ? ' selected' : ''}>Phần trăm (%)</option><option value="FIXED"${d.type === 'FIXED' ? ' selected' : ''}>Số tiền cố định (₫)</option></select></div></div>
+  <div class="fld"><label for="cp_d">Mô tả (hiện cho khách)</label><input id="cp_d" value="${esc(d.description || '')}" maxlength="200"></div>
+  <div class="f2"><div class="fld"><label for="cp_v">Giá trị giảm</label><input id="cp_v" type="number" min="1" value="${num(d.value)}"></div><div class="fld"><label for="cp_mx">Giảm tối đa (₫, chỉ cho loại %)</label><input id="cp_mx" type="number" min="0" value="${num(d.maxDiscount)}" placeholder="Không giới hạn"></div></div>
+  <div class="f2"><div class="fld"><label for="cp_mo">Đơn tối thiểu (₫)</label><input id="cp_mo" type="number" min="0" value="${num(d.minOrder)}"></div><div class="fld"><label for="cp_ul">Tổng số lượt dùng</label><input id="cp_ul" type="number" min="1" value="${num(d.usageLimit)}" placeholder="Không giới hạn"></div></div>
+  <div class="f2"><div class="fld"><label for="cp_pu">Số lượt mỗi khách</label><input id="cp_pu" type="number" min="1" value="${num(d.perUserLimit)}" placeholder="Không giới hạn"></div><div class="fld"><label>&nbsp;</label><label class="row"><input id="cp_a" type="checkbox" style="width:auto"${d.isActive ? ' checked' : ''}> Đang bật</label></div></div>
+  <div class="f2"><div class="fld"><label for="cp_s">Bắt đầu (để trống = ngay)</label><input id="cp_s" type="datetime-local" value="${toLocalInput(d.startsAt)}"></div><div class="fld"><label for="cp_e">Kết thúc (để trống = không hết hạn)</label><input id="cp_e" type="datetime-local" value="${toLocalInput(d.expiresAt)}"></div></div>
+  <div class="err" id="cp_err"></div><div class="row"><button class="btn" data-a="cpsv" data-p="${c ? c.id : 0}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
+}
+
+Object.assign(A, {
+  cpapply: async () => {
+    const code = $('#cp_code').value.trim(),
+      e = $('#cp_msg');
+    if (!code) return (e.textContent = 'Vui lòng nhập mã giảm giá');
+    try {
+      const c = await couponCheck(code);
+      S.coupon = { code: c.code, description: c.description, type: c.type, value: c.value, minOrder: c.minOrder, maxDiscount: c.maxDiscount };
+      keepCo();
+      render();
+      toast('Đã áp dụng mã ' + c.code);
+    } catch (x) {
+      e.textContent = x.message;
+    }
+  },
+  cpclear: () => {
+    keepCo();
+    S.coupon = null;
+    render();
+  },
+  cpedit: p => {
+    S.cpid = +p;
+    modal(cpForm(+p ? getCoupons().find(c => c.id == p) : null));
+  },
+  cpsv: async () => {
+    const g = id => $('#' + id).value.trim(),
+      e = $('#cp_err'),
+      n = id => (g(id) === '' ? null : +g(id)),
+      iso = id => (g(id) ? new Date(g(id)).toISOString() : null);
+    const code = g('cp_c').toUpperCase(),
+      type = g('cp_t'),
+      value = +g('cp_v');
+    if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return (e.textContent = 'Mã gồm 3 đến 30 ký tự: chữ, số, gạch ngang hoặc gạch dưới');
+    if (!(value >= 1)) return (e.textContent = 'Giá trị giảm phải lớn hơn 0');
+    if (type === 'PERCENT' && value > 100) return (e.textContent = 'Giảm theo phần trăm tối đa là 100%');
+    const startsAt = iso('cp_s'),
+      expiresAt = iso('cp_e');
+    if (startsAt && expiresAt && new Date(startsAt) >= new Date(expiresAt)) return (e.textContent = 'Ngày kết thúc phải sau ngày bắt đầu');
+    const d = { code, description: g('cp_d'), type, value, minOrder: n('cp_mo') || 0, maxDiscount: type === 'PERCENT' ? n('cp_mx') || null : null, usageLimit: n('cp_ul'), perUserLimit: n('cp_pu'), startsAt, expiresAt, isActive: $('#cp_a').checked };
+    try {
+      await cpSave(S.cpid, d);
+      modal('');
+      render();
+      toast('Đã lưu mã giảm giá');
+    } catch (x) {
+      e.textContent = x.message;
+    }
+  },
+  cptog: async p => {
+    const c = getCoupons().find(x => x.id == p);
+    try {
+      await cpSave(c.id, { ...c, isActive: !c.isActive });
+      render();
+      toast(c.isActive ? 'Đã bật mã ' + c.code : 'Đã tắt mã ' + c.code);
+    } catch (x) {
+      toast(x.message);
+    }
+  },
+  cpdel: async p => {
+    const c = getCoupons().find(x => x.id == p);
+    if (!confirm('Xóa mã giảm giá ' + c.code + '?')) return;
+    try {
+      await cpRemove(p);
+      render();
+      toast('Đã xóa mã giảm giá');
+    } catch (x) {
+      toast(x.message);
+    }
+  }
+});
+
+/* ==========================================================================
+  16. CHAT TRỰC TIẾP (khách với admin, cập nhật bằng cách hỏi server định kỳ)
+   ========================================================================== */
+const CH = { open: false, msgs: [], last: 0, unread: 0, busy: false, off: false, tick: 0, uid: null, ad: { threads: [], uid: 0, msgs: [], last: 0, unread: 0, live: false } };
+
+/* Cổng dữ liệu chat: demo lưu trong trình duyệt, api.js ghi đè để gọi server */
+function chatStore() {
+  return db.chats || (db.chats = {});
+}
+const chatId = () => (db.chatSeq = (db.chatSeq || 0) + 1);
+const chatOut = m => ({ id: m.id, admin: m.admin, body: m.body, t: m.t });
+let chatFetch = async after => (chatStore()[db.session] || []).filter(m => m.id > after).map(chatOut);
+let chatSend = async body => {
+  const m = { id: chatId(), admin: false, body, t: Date.now(), rU: true, rA: false };
+  (chatStore()[db.session] || (chatStore()[db.session] = [])).push(m);
+  save();
+  return chatOut(m);
+};
+let chatUnread = async () => (chatStore()[db.session] || []).filter(m => m.admin && !m.rU).length;
+let chatMarkRead = async () => {
+  (chatStore()[db.session] || []).forEach(m => { if (m.admin) m.rU = true; });
+  save();
+};
+let achThreads = async () =>
+  Object.entries(chatStore())
+    .filter(([, l]) => l.length)
+    .map(([id, l]) => {
+      const last = l[l.length - 1],
+        u = db.users.find(x => x.id == id) || { name: 'Khách #' + id, email: '' };
+      return { userId: +id, name: u.name, email: u.email, lastBody: last.body, lastFromAdmin: last.admin, lastAt: last.t, unread: l.filter(m => !m.admin && !m.rA).length };
+    })
+    .sort((a, b) => b.lastAt - a.lastAt);
+let achMessages = async (userId, after) => {
+  const l = chatStore()[userId] || [];
+  l.forEach(m => { if (!m.admin) m.rA = true; });
+  save();
+  return l.filter(m => m.id > after).map(chatOut);
+};
+let achSend = async (userId, body) => {
+  const m = { id: chatId(), admin: true, body, t: Date.now(), rU: false, rA: true };
+  (chatStore()[userId] || (chatStore()[userId] = [])).push(m);
+  save();
+  return chatOut(m);
+};
+let achUnread = async () => Object.values(chatStore()).reduce((s, l) => s + l.filter(m => !m.admin && !m.rA).length, 0);
+
+const chatTime = t => {
+  const d = new Date(t),
+    p = n => String(n).padStart(2, '0'),
+    hm = p(d.getHours()) + ':' + p(d.getMinutes());
+  return d.toDateString() === new Date().toDateString() ? hm : p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + hm;
+};
+const chatMsgsHtml = (msgs, adminView) =>
+  msgs.length
+    ? msgs.map(m => `<div class="cmsg ${m.admin === adminView ? 'me' : 'them'}"><div class="cbub">${esc(m.body).replace(/\n/g, '<br>')}</div><span class="ctime">${chatTime(m.t)}</span></div>`).join('')
+    : `<p class="mut center">${adminView ? 'Chưa có tin nhắn.' : 'Xin chào! Hãy nhắn cho NSHV nếu bạn cần tư vấn size, đơn hàng hay mã giảm giá.'}</p>`;
+
+function chatPanelHtml() {
+  const u = user(),
+    head = `<div class="chhead"><div><b>Chat với NSHV</b><span class="mut">Thường phản hồi trong vài phút</span></div><button class="ib" data-a="chat" aria-label="Đóng chat">✕</button></div>`;
+  if (!u) return head + '<div class="chbody center"><p>Đăng nhập để nhắn tin trực tiếp với cửa hàng.</p><button class="btn" data-a="go" data-p="auth:login">Đăng nhập</button></div>';
+  if (CH.off) return head + '<div class="chbody center"><p class="mut">Máy chủ chưa hỗ trợ chat. Hãy cập nhật backend (xem hướng dẫn).</p></div>';
+  return head + `<div class="chbody" id="chlist">${chatMsgsHtml(CH.msgs, false)}</div><div class="chform"><textarea id="ch_in" rows="1" maxlength="1000" placeholder="Nhập tin nhắn…" aria-label="Nhập tin nhắn"></textarea><button class="btn" data-a="chsend">Gửi</button></div>`;
+}
+
+function chatPaint() {
+  const box = $('#chatbox');
+  if (!box) return;
+  box.hidden = !CH.open;
+  document.body.classList.toggle('chat-open', CH.open);
+  if (!CH.open) return;
+  box.innerHTML = chatPanelHtml();
+  const l = $('#chlist');
+  if (l) l.scrollTop = l.scrollHeight;
+  const i = $('#ch_in');
+  if (i && matchMedia('(min-width: 761px)').matches) i.focus();
+}
+function chatPaintList() {
+  const l = $('#chlist');
+  if (!l) return;
+  const near = l.scrollHeight - l.scrollTop - l.clientHeight < 80;
+  l.innerHTML = chatMsgsHtml(CH.msgs, false);
+  if (near) l.scrollTop = l.scrollHeight;
+}
+function chatBadge() {
+  const u = user(),
+    n = u && u.role === 'admin' ? CH.ad.unread : CH.unread,
+    c = $('#chatcnt');
+  if (c) { c.hidden = !n; c.textContent = n > 9 ? '9+' : n; }
+  const chip = document.querySelector('[data-a=atab][data-p=achat]');
+  if (chip) chip.innerHTML = 'Tin nhắn' + (CH.ad.unread ? ` <span class="cnt2">${CH.ad.unread}</span>` : '');
+}
+
+async function chatOpened() {
+  try {
+    const ms = await chatFetch(CH.last);
+    if (ms.length) { CH.msgs.push(...ms); CH.last = ms[ms.length - 1].id; }
+    await chatMarkRead();
+    CH.unread = 0;
+    chatBadge();
+    chatPaintList();
+  } catch (e) {
+    if (e.status === 404) { CH.off = true; chatPaint(); }
+  }
+}
+
+/* --- khung chat của admin (tab "Tin nhắn") --- */
+function achat() {
+  const AD = CH.ad,
+    th = AD.threads.find(t => t.userId === AD.uid);
+  const list = AD.threads.length ? AD.threads.map(thr => threadHtml(thr)).join('') : '<p class="mut" style="padding:12px">Chưa có cuộc trò chuyện nào. Khi khách nhắn tin, hộp thoại sẽ hiện ở đây.</p>';
+  const pane = AD.uid
+    ? `<div class="chhead"><button class="btn o s chback" data-a="chback" aria-label="Quay lại danh sách">←</button><div><b>${esc(th ? th.name : 'Khách hàng')}</b><span class="mut">${esc(th ? th.email : '')}</span></div></div><div class="chbody" id="adlist">${chatMsgsHtml(AD.msgs, true)}</div><div class="chform"><textarea id="ad_in" rows="1" maxlength="1000" placeholder="Trả lời khách…" aria-label="Trả lời khách"></textarea><button class="btn" data-a="adsend">Gửi</button></div>`
+    : '<div class="chbody center"><p class="mut">Chọn một cuộc trò chuyện ở bên trái.</p></div>';
+  return (CH.off ? '<p class="err" style="min-height:0">Máy chủ chưa hỗ trợ chat. Hãy cập nhật backend.</p>' : '') + `<div class="achat${AD.uid ? ' open' : ''}"><div class="athreads" id="athreads">${list}</div><div class="apane box">${pane}</div></div>`;
+}
+const threadHtml = t =>
+  `<button class="cthr${t.userId === CH.ad.uid ? ' on' : ''}" data-a="chopen" data-p="${t.userId}"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><b>${esc(t.name)}</b>${t.unread ? `<span class="cnt2">${t.unread}</span>` : ''}</div><span class="mut ctl">${esc((t.lastFromAdmin ? 'Bạn: ' : '') + t.lastBody)}</span></button>`;
+
+function adminPaint() {
+  const th = $('#athreads');
+  if (th && CH.ad.threads.length) th.innerHTML = CH.ad.threads.map(threadHtml).join('');
+  const l = $('#adlist');
+  if (l) {
+    const near = l.scrollHeight - l.scrollTop - l.clientHeight < 80;
+    l.innerHTML = chatMsgsHtml(CH.ad.msgs, true);
+    if (near) l.scrollTop = l.scrollHeight;
+  }
+}
+
+async function adminChatTick() {
+  const AD = CH.ad,
+    onChat = S.view === 'admin' && S.adm === 'achat';
+  if (onChat) {
+    AD.threads = await achThreads();
+    if (AD.uid) {
+      const ms = await achMessages(AD.uid, AD.last);
+      if (ms.length) { AD.msgs.push(...ms); AD.last = ms[ms.length - 1].id; }
+    }
+    AD.unread = AD.threads.reduce((s, t) => s + t.unread, 0);
+    adminPaint();
+  } else if (CH.tick % 5 === 0) AD.unread = await achUnread();
+  chatBadge();
+}
+
+async function chatLoop() {
+  if (document.hidden || !db) return;
+  const u = user();
+  CH.tick++;
+  if (!u || CH.off) return;
+  try {
+    if (u.role === 'admin') await adminChatTick();
+    else if (CH.open) {
+      const ms = await chatFetch(CH.last);
+      if (ms.length) { CH.msgs.push(...ms); CH.last = ms[ms.length - 1].id; chatPaintList(); await chatMarkRead(); }
+    } else if (CH.tick % 5 === 0) { CH.unread = await chatUnread(); chatBadge(); }
+  } catch (e) {
+    if (e.status === 404) { CH.off = true; chatPaint(); }
+  }
+}
+
+/* Gọi sau mỗi lần vẽ trang: đồng bộ chat, thanh điều hướng dưới và số đếm */
+function chatUi() {
+  if (!user()) S.coupon = null;
+  if (CH.uid !== db.session) {
+    Object.assign(CH, { uid: db.session, open: false, msgs: [], last: 0, unread: 0, off: false });
+    Object.assign(CH.ad, { threads: [], uid: 0, msgs: [], last: 0, unread: 0, live: false });
+    chatPaint();
+    const u = user();
+    if (u) (u.role === 'admin' ? achUnread() : chatUnread()).then(n => { if (u.role === 'admin') CH.ad.unread = n; else CH.unread = n; chatBadge(); }).catch(e => { if (e.status === 404) CH.off = true; });
+  }
+  const onChat = S.view === 'admin' && S.adm === 'achat';
+  if (onChat && !CH.ad.live) { CH.ad.live = true; adminChatTick().catch(e => { if (e.status === 404) { CH.off = true; render(); } }); }
+  if (!onChat) CH.ad.live = false;
+  const a = $('#cc'), b = $('#cc2');
+  if (a && b) { b.hidden = a.hidden; b.textContent = a.textContent; }
+  const av = $('#av'), av2 = $('#av2');
+  if (av && av2) { av2.innerHTML = av.innerHTML; av2.style.background = av.style.background; }
+  const v = S.view, key = v === 'home' || v === 'col' ? 'home' : v === 'products' || v === 'detail' ? 'products' : v === 'cart' || v === 'checkout' ? 'cart' : v === 'orders' ? 'orders' : v === 'profile' || v === 'auth' || v === 'admin' ? 'acct' : '';
+  document.querySelectorAll('[data-bn]').forEach(e => e.classList.toggle('on', e.dataset.bn === key));
+  chatBadge();
+}
+
+Object.assign(A, {
+  chat: () => {
+    const u = user();
+    if (u && u.role === 'admin') { S.adm = 'achat'; return go('admin'); }
+    CH.open = !CH.open;
+    chatPaint();
+    if (CH.open && u) chatOpened();
+  },
+  chsend: async () => {
+    const i = $('#ch_in'),
+      body = i && i.value.trim();
+    if (!body || CH.busy) return;
+    CH.busy = true;
+    try {
+      const m = await chatSend(body);
+      if (!CH.msgs.some(x => x.id === m.id)) CH.msgs.push(m);
+      CH.last = Math.max(CH.last, m.id);
+      i.value = '';
+      chatPaintList();
+      const l = $('#chlist');
+      if (l) l.scrollTop = l.scrollHeight;
+    } catch (e) {
+      if (e.status === 404) { CH.off = true; chatPaint(); } else toast(e.message);
+    }
+    CH.busy = false;
+    if (i) i.focus();
+  },
+  chopen: async p => {
+    const AD = CH.ad;
+    AD.uid = +p; AD.msgs = []; AD.last = 0;
+    try {
+      AD.msgs = await achMessages(AD.uid, 0);
+      AD.last = AD.msgs.length ? AD.msgs[AD.msgs.length - 1].id : 0;
+      const t = AD.threads.find(x => x.userId === AD.uid);
+      if (t) t.unread = 0;
+      AD.unread = AD.threads.reduce((s, x) => s + x.unread, 0);
+    } catch (e) { toast(e.message); }
+    render();
+    const l = $('#adlist');
+    if (l) l.scrollTop = l.scrollHeight;
+  },
+  chback: () => { CH.ad.uid = 0; render(); },
+  adsend: async () => {
+    const i = $('#ad_in'),
+      body = i && i.value.trim(),
+      AD = CH.ad;
+    if (!body || !AD.uid) return;
+    try {
+      const m = await achSend(AD.uid, body);
+      if (!AD.msgs.some(x => x.id === m.id)) AD.msgs.push(m);
+      AD.last = Math.max(AD.last, m.id);
+      i.value = '';
+      adminPaint();
+      const l = $('#adlist');
+      if (l) l.scrollTop = l.scrollHeight;
+    } catch (e) { toast(e.message); }
+    if (i) i.focus();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if ((e.target.id === 'ch_in' || e.target.id === 'ad_in') && e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    A[e.target.id === 'ch_in' ? 'chsend' : 'adsend']();
+  }
+});
+setInterval(chatLoop, 3000);
+
+
+/* ==========================================================================
+  17. KHỞI ĐỘNG
    ========================================================================== */
 
 addEventListener('DOMContentLoaded', () =>

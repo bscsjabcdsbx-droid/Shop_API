@@ -34,6 +34,7 @@ model User {
   orders       Order[]
   reviews      Review[]
   wishlist     Wishlist[]
+  chatMessages ChatMessage[]
 }
 
 model Category {
@@ -197,4 +198,52 @@ model Upload {
   mime      String
   data      Bytes
   createdAt DateTime @default(now())
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+model Coupon {
+  id           Int        @id @default(autoincrement())
+  code         String     @unique
+  description  String     @default("")
+  type         CouponType
+  value        Int
+  minOrder     Int        @default(0)
+  maxDiscount  Int?
+  usageLimit   Int?
+  perUserLimit Int?
+  usedCount    Int        @default(0)
+  startsAt     DateTime?
+  expiresAt    DateTime?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  uses         CouponUse[]
+}
+
+model CouponUse {
+  id        Int      @id @default(autoincrement())
+  couponId  Int
+  orderId   Int      @unique
+  userId    Int
+  discount  Int
+  createdAt DateTime @default(now())
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, userId])
+}
+
+model ChatMessage {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  fromAdmin   Boolean  @default(false)
+  body        String
+  readByUser  Boolean  @default(false)
+  readByAdmin Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, id])
 }

@@ -117,6 +117,8 @@
     ship: o.shippingFee,
     sub: o.subtotal,
     total: o.total,
+    disc: o.discount ?? Math.max(0, o.subtotal + o.shippingFee - o.total),
+    coupon: o.couponCode || '',
     items: o.items.map(i => ({
       pid: VM[i.variantId] || 0,
       name: i.name,
@@ -125,6 +127,20 @@
       price: i.price,
       qty: i.quantity
     }))
+  });
+  const mapMsg = m => ({ id: m.id, admin: m.fromAdmin, body: m.body, t: Date.parse(m.createdAt) });
+  const toCouponBody = d => ({
+    code: d.code,
+    description: d.description || '',
+    type: d.type,
+    value: d.value,
+    minOrder: d.minOrder || 0,
+    maxDiscount: d.maxDiscount ?? null,
+    usageLimit: d.usageLimit ?? null,
+    perUserLimit: d.perUserLimit ?? null,
+    startsAt: d.startsAt || null,
+    expiresAt: d.expiresAt || null,
+    isActive: d.isActive
   });
   const mapCol = c => ({
     id: c.id,
@@ -221,6 +237,7 @@
         db.products = (await rq('/admin/products')).map(mapP);
         ADMIN_P = true;
       } else if (S.adm === 'aord') db.orders = (await rq('/admin/orders')).map(mapO);
+      else if (S.adm === 'acp') db.coupons = await rq('/admin/coupons');
       else if (S.adm === 'acol' && SERVER_COLS) db.collections = (await rq('/admin/collections')).map(mapCol);
       else if (S.adm === 'acus') {
         db.orders = (await rq('/admin/orders')).map(mapO);
@@ -472,11 +489,13 @@
             district: c.co_dist.trim(),
             ward: c.co_ward.trim(),
             note: c.co_note || undefined,
-            paymentMethod: 'COD'
+            paymentMethod: 'COD',
+            couponCode: S.coupon ? S.coupon.code : undefined
           }
         });
         S.busy = false;
         S.co = null;
+        S.coupon = null;
         S.fast = false;
         await loadCart();
         await loadProducts();
@@ -739,6 +758,39 @@
     };
   }
 
+  /* --- 5.10 Mã giảm giá --- */
+  function patchCoupons() {
+    couponCheck = async code => {
+      try {
+        return await rq('/coupons/validate', { method: 'POST', body: { code } });
+      } catch (e) {
+        if (e.status === 404 && e.message === 'Lỗi 404') throw new Error('Máy chủ chưa hỗ trợ mã giảm giá. Hãy cập nhật backend.');
+        throw e;
+      }
+    };
+    cpSave = async (id, d) => {
+      await rq(id ? '/admin/coupons/' + id : '/admin/coupons', { method: id ? 'PUT' : 'POST', body: toCouponBody(d) });
+      db.coupons = await rq('/admin/coupons');
+    };
+    cpRemove = async id => {
+      await rq('/admin/coupons/' + id, { method: 'DELETE' });
+      db.coupons = await rq('/admin/coupons');
+    };
+  }
+
+  /* --- 5.11 Chat (khách và admin): gọi server, server cũ chưa có thì giao diện báo "chưa hỗ trợ" --- */
+  function patchChat() {
+    chatFetch = async after => (await rq('/chat/messages?after=' + after)).messages.map(mapMsg);
+    chatSend = async body => mapMsg(await rq('/chat/messages', { method: 'POST', body: { body } }));
+    chatUnread = async () => (await rq('/chat/unread')).count;
+    chatMarkRead = () => rq('/chat/read', { method: 'POST' });
+    achThreads = async () =>
+      (await rq('/admin/chat/threads')).map(t => ({ userId: t.userId, name: t.name, email: t.email, lastBody: t.lastBody, lastFromAdmin: t.lastFromAdmin, lastAt: Date.parse(t.lastAt), unread: t.unread }));
+    achMessages = async (u, after) => (await rq(`/admin/chat/${u}/messages?after=${after}`)).messages.map(mapMsg);
+    achSend = async (u, body) => mapMsg(await rq(`/admin/chat/${u}/messages`, { method: 'POST', body: { body } }));
+    achUnread = async () => (await rq('/admin/chat/unread')).count;
+  }
+
   function install() {
     patchCore();
     patchCart();
@@ -749,6 +801,8 @@
     patchCollections();
     patchReviews();
     patchDashboard();
+    patchCoupons();
+    patchChat();
   }
 
   /* ==========================================================================
@@ -766,7 +820,7 @@
     try {
       wish = JSON.parse(localStorage.getItem('mono-wish')) || {};
     } catch (e) {}
-    db = { v: 1, session: null, users: [], products: [], orders: [], carts: {}, wish, reviews: {} };
+    db = { v: 1, session: null, users: [], products: [], orders: [], carts: {}, wish, reviews: {}, coupons: [], chats: {} };
     install();
     await Promise.all([loadProducts(), loadCats(), loadCols()]);
     if (TOKEN) {

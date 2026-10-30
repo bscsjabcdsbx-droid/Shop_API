@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NSHV — Thời trang tối giản</title>
 <meta name="description" content="NSHV: thời trang tối giản, chất liệu tốt, giao hàng toàn quốc. Áo, quần, váy, áo khoác.">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" type="image/png" href="logo.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -16,14 +17,13 @@
 <nav id="nav" aria-label="Điều hướng chính">
 <a data-a="go" data-p="home" data-nav="home" tabindex="0">Trang chủ</a>
 <a data-a="allp" data-nav="products" tabindex="0">Sản phẩm</a>
-<a data-a="sale" data-nav="sale" tabindex="0">Khuyến mãi</a>
 <a data-a="go" data-p="orders" data-nav="orders" tabindex="0">Đơn hàng</a>
 </nav>
 <span class="sp"></span>
 <div class="sbox"><input class="srch" id="hs" type="search" placeholder="Tìm sản phẩm" aria-label="Tìm kiếm" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sug"><div class="sug" id="sug" role="listbox" hidden></div></div>
 <button class="ib" data-a="go" data-p="wish" aria-label="Yêu thích">♡</button>
-<button class="ib" data-a="go" data-p="cart" aria-label="Giỏ hàng">🛒<span class="cnt" id="cc" hidden></span></button>
-<button class="ib" data-a="acct" aria-label="Tài khoản"><span class="avatar" id="av"></span></button>
+<button class="ib hm" data-a="go" data-p="cart" aria-label="Giỏ hàng">🛒<span class="cnt" id="cc" hidden></span></button>
+<button class="ib hm" data-a="acct" aria-label="Tài khoản"><span class="avatar" id="av"></span></button>
 </div></header>
 <main id="main" class="wrap"></main>
 <footer><div class="wrap"><div class="fg">
@@ -32,6 +32,18 @@
 <div><h4>Chính sách</h4><ul><li>Đổi trả 7 ngày</li><li>Miễn phí ship từ 500.000₫</li><li>Bảo mật thông tin</li></ul></div>
 <div><h4>Liên hệ</h4><ul><li>hello@NSHV.vn</li><li>1900 0000</li><li>Facebook · Instagram</li></ul></div>
 </div><p style="text-align:center;margin-top:24px">© 2026 NSHV.</p></div></footer>
+
+<nav class="bnav" id="bnav" aria-label="Điều hướng nhanh">
+<button data-a="go" data-p="home" data-bn="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Trang chủ</span></button>
+<button data-a="allp" data-bn="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Sản phẩm</span></button>
+<button data-a="go" data-p="cart" data-bn="cart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L21 7H6"/></svg><span>Giỏ hàng</span><span class="cnt" id="cc2" hidden></span></button>
+<button data-a="go" data-p="orders" data-bn="orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/></svg><span>Đơn hàng</span></button>
+<button data-a="acct" data-bn="acct"><span class="avatar sm" id="av2"></span><span>Tài khoản</span></button>
+</nav>
+
+<button class="chatfab" id="chatfab" data-a="chat" aria-label="Chat với cửa hàng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg><span class="cnt" id="chatcnt" hidden></span></button>
+<div class="chatbox" id="chatbox" role="dialog" aria-label="Chat với cửa hàng" hidden></div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="modal"></div>
 <script src="app.js"></script>

@@ -1,6 +1,7 @@
 import { OrderStatus, Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import { attachCoupons, releaseCoupon } from "../coupon.js";
 import { db, HttpError, requireAdmin, requireAuth, wrap } from "../lib.js";
 
 const r = Router();
@@ -67,18 +68,21 @@ r.patch("/variants/:id/stock", wrap(async (req, res) => {
 
 r.get("/orders", wrap(async (req, res) => {
   const { code, status } = z.object({ code: z.string().optional(), status: z.nativeEnum(OrderStatus).optional() }).parse(req.query);
-  res.json(await db.order.findMany({ where: { ...(code && { code: { contains: code, mode: "insensitive" } }), ...(status && { status }) }, orderBy: { createdAt: "desc" }, include: { items: true } }));
+  const list = await db.order.findMany({ where: { ...(code && { code: { contains: code, mode: "insensitive" } }), ...(status && { status }) }, orderBy: { createdAt: "desc" }, include: { items: true } });
+  res.json(await attachCoupons(list));
 }));
 const flow: Record<OrderStatus, OrderStatus[]> = { PENDING: ["CONFIRMED","CANCELLED"], CONFIRMED: ["PREPARING","CANCELLED"], PREPARING: ["SHIPPING","CANCELLED"], SHIPPING: ["DELIVERED"], DELIVERED: [], CANCELLED: [] };
 r.patch("/orders/:id/status", wrap(async (req, res) => {
   const { status } = z.object({ status: z.nativeEnum(OrderStatus) }).parse(req.body);
-  await db.$transaction(async tx => {
+  const orderId = await db.$transaction(async tx => {
     const o = await tx.order.findUnique({ where: { id: Number(req.params.id) }, include: { items: true } });
     if (!o) throw new HttpError(404, "Không tìm thấy đơn hàng");
     if (!flow[o.status].includes(status)) throw new HttpError(409, `Không thể chuyển từ ${o.status} sang ${status}`);
     await tx.order.update({ where: { id: o.id }, data: { status } });
     if (status === "CANCELLED") for (const i of o.items) if (i.variantId !== null) await tx.productVariant.update({ where: { id: i.variantId }, data: { stock: { increment: i.quantity } } });
+    return o.id;
   });
+  if (status === "CANCELLED") await releaseCoupon(orderId);
   res.json({ ok: true });
 }));
 
@@ -189,6 +193,98 @@ r.post("/upload", wrap(async (req, res) => {
   if (!m) throw new HttpError(400, "Chỉ nhận ảnh PNG, JPEG hoặc WebP");
   const row = await db.upload.create({ data: { mime: m[1], data: Buffer.from(m[2], "base64") }, select: { id: true } });
   res.status(201).json({ url: `/api/uploads/${row.id}` });
+}));
+
+// ===== Mã giảm giá =====
+const dateRef = z.string().datetime({ offset: true }).nullable().optional();
+const couponSchema = z.object({
+  code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,30}$/, "Mã gồm 3 đến 30 ký tự: chữ, số, gạch ngang hoặc gạch dưới"),
+  description: z.string().trim().max(200).default(""),
+  type: z.enum(["PERCENT", "FIXED"]),
+  value: z.number().int().min(1),
+  minOrder: z.number().int().min(0).default(0),
+  maxDiscount: z.number().int().min(1).nullable().optional(),
+  usageLimit: z.number().int().min(1).nullable().optional(),
+  perUserLimit: z.number().int().min(1).nullable().optional(),
+  startsAt: dateRef,
+  expiresAt: dateRef,
+  isActive: z.boolean().default(true),
+})
+  .refine(c => c.type !== "PERCENT" || c.value <= 100, { message: "Giảm theo phần trăm tối đa là 100%" })
+  .refine(c => !c.startsAt || !c.expiresAt || new Date(c.startsAt) < new Date(c.expiresAt), { message: "Ngày kết thúc phải sau ngày bắt đầu" });
+
+const couponData = (c: z.infer<typeof couponSchema>) => ({
+  code: c.code, description: c.description, type: c.type, value: c.value, minOrder: c.minOrder,
+  maxDiscount: c.type === "PERCENT" ? c.maxDiscount ?? null : null,
+  usageLimit: c.usageLimit ?? null, perUserLimit: c.perUserLimit ?? null,
+  startsAt: c.startsAt ? new Date(c.startsAt) : null, expiresAt: c.expiresAt ? new Date(c.expiresAt) : null,
+  isActive: c.isActive,
+});
+
+function duplicateCode(e: unknown): never {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") throw new HttpError(409, "Mã giảm giá này đã tồn tại");
+  throw e;
+}
+
+r.get("/coupons", wrap(async (_req, res) => res.json(await db.coupon.findMany({ orderBy: { id: "desc" } }))));
+r.post("/coupons", wrap(async (req, res) => {
+  const c = couponSchema.parse(req.body);
+  res.status(201).json(await db.coupon.create({ data: couponData(c) }).catch(duplicateCode));
+}));
+r.put("/coupons/:id", wrap(async (req, res) => {
+  const c = couponSchema.parse(req.body);
+  res.json(await db.coupon.update({ where: { id: parseId(req.params.id) }, data: couponData(c) }).catch(duplicateCode));
+}));
+r.delete("/coupons/:id", wrap(async (req, res) => {
+  await db.coupon.delete({ where: { id: parseId(req.params.id) } });
+  res.json({ ok: true });
+}));
+
+// ===== Chat với khách =====
+const chatBody = z.object({ body: z.string().trim().min(1).max(1000) });
+
+// Danh sách cuộc trò chuyện: tin mới nhất của mỗi khách và số tin khách chưa được đọc
+r.get("/chat/threads", wrap(async (_req, res) => {
+  const [latest, unread] = await Promise.all([
+    db.chatMessage.findMany({
+      distinct: ["userId"], orderBy: { id: "desc" }, take: 100,
+      select: { id: true, userId: true, fromAdmin: true, body: true, createdAt: true, user: { select: { name: true, email: true } } },
+    }),
+    db.chatMessage.groupBy({ by: ["userId"], where: { fromAdmin: false, readByAdmin: false }, _count: { _all: true } }),
+  ]);
+  const counts = new Map(unread.map(u => [u.userId, u._count._all]));
+  res.json(latest.map(m => ({
+    userId: m.userId, name: m.user.name, email: m.user.email, lastBody: m.body, lastFromAdmin: m.fromAdmin,
+    lastAt: m.createdAt, unread: counts.get(m.userId) ?? 0,
+  })));
+}));
+
+r.get("/chat/unread", wrap(async (_req, res) => {
+  res.json({ count: await db.chatMessage.count({ where: { fromAdmin: false, readByAdmin: false } }) });
+}));
+
+// Lấy tin nhắn của một khách (tin mới hơn `after`) và đánh dấu đã đọc
+r.get("/chat/:userId/messages", wrap(async (req, res) => {
+  const userId = parseId(req.params.userId);
+  const after = z.coerce.number().int().min(0).default(0).parse(req.query.after);
+  const messages = await db.chatMessage.findMany({
+    where: { userId, id: { gt: after } }, orderBy: { id: "asc" }, take: 200,
+    select: { id: true, fromAdmin: true, body: true, createdAt: true },
+  });
+  await db.chatMessage.updateMany({ where: { userId, fromAdmin: false, readByAdmin: false }, data: { readByAdmin: true } });
+  res.json({ messages });
+}));
+
+r.post("/chat/:userId/messages", wrap(async (req, res) => {
+  const userId = parseId(req.params.userId);
+  const { body } = chatBody.parse(req.body);
+  const exists = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!exists) throw new HttpError(404, "Không tìm thấy khách hàng");
+  const m = await db.chatMessage.create({
+    data: { userId, fromAdmin: true, body, readByAdmin: true },
+    select: { id: true, fromAdmin: true, body: true, createdAt: true },
+  });
+  res.status(201).json(m);
 }));
 
 export default r;
