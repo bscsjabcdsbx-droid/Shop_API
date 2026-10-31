@@ -117,3 +117,24 @@ git push origin main
 - Nút "Hoàn thành" của admin đưa đơn qua các trạng thái hợp lệ cho tới "Đã giao" bằng API đổi trạng thái sẵn có.
 - Doanh thu trên trang tổng quan do giao diện tính, chỉ cộng các đơn "Đã giao". Số liệu trên server (`/api/admin/stats`) không bị thay đổi.
 - Ảnh tải lên lưu trong `public/uploads/`. Trên Render gói miễn phí, ổ đĩa bị xóa mỗi lần deploy lại, nên hãy dán đường dẫn ảnh từ dịch vụ lưu trữ ảnh hoặc gắn Persistent Disk.
+
+## 10. Cách chạy model CatVTON_AI
+  Mở CMD
+  chạy 3 lệnh sau
+    conda activate catvton311
+    cd "D:\Project 1\CatVTON-edited\CatVTON-AI"
+    .\start_api.bat
+
+  Mở cửa số CMD mới và chạy
+    cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000
+
+  Cloudflare sẽ cấp một địa chỉ dạng: https://xxxxx.trycloudflare.com
+
+  Vào Render.com → Backend Web Service của Shop_API → Environment
+
+  Kiểm tra hai biến:
+
+  CATVTON_API_URL	Địa chỉ HTTPS Cloudflare vừa tạo
+  CATVTON_API_KEY	API key phải trùng với cấu hình của CatVTON
+
+  Nếu địa chỉ tunnel thay đổi, cập nhật lại CATVTON_API_URL, lưu và chờ Render khởi động lại backend.
