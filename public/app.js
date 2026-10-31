@@ -555,7 +555,7 @@ function detail() {
    })
    .join('')}</div>
  <div class="row" style="margin-bottom:6px"><b>Số lượng</b><button class="btn o s" data-a="qty" data-p="-1">−</button><b>${s.qty || 1}</b><button class="btn o s" data-a="qty" data-p="1">+</button><span class="mut">${s.size && s.color ? (max > 0 ? `Còn ${max} sản phẩm` : 'Hết hàng') : instock(p) ? 'Còn hàng' : 'Hết hàng'}</span></div>
- <div class="err" id="serr"></div><div class="row"><button class="btn" data-a="add" data-p="0" ${instock(p) ? '' : 'disabled'}>Thêm vào giỏ</button><button class="btn o" data-a="add" data-p="1" ${instock(p) ? '' : 'disabled'}>Mua ngay</button><button class="btn o" data-a="wish" data-p="${p.id}">${w ? '♥ Đã thích' : '♡ Yêu thích'}</button>${window.TryOn && TryOn.supports(p) !== false ? `<button class="btn o" data-a="tryon" data-p="${p.id}">Thử đồ với AI</button>` : ''}</div></div></div>
+ <div class="err" id="serr"></div><div class="row"><button class="btn" data-a="add" data-p="0" ${instock(p) ? '' : 'disabled'}>Thêm vào giỏ</button><button class="btn o" data-a="add" data-p="1" ${instock(p) ? '' : 'disabled'}>Mua ngay</button><button class="btn o" data-a="wish" data-p="${p.id}">${w ? '♥ Đã thích' : '♡ Yêu thích'}</button>${window.TryOn && TryOn.supports(p) !== false ? `<button class="btn o" data-a="tryon" data-p="${p.id}">Thử đồ với AI</button>` : ''}${window.Outfit ? `<button class="btn o" data-a="outfit" data-p="${p.id}">Phối đồ với sản phẩm này</button>` : ''}</div></div></div>
  <h2>Thông tin chi tiết</h2><div class="box"><p><b>Chất liệu:</b> ${esc(p.mat)}</p><p><b>Bảo quản:</b> Giặt máy ở 30°C, không dùng chất tẩy mạnh, phơi trong bóng râm, ủi nhiệt độ thấp.</p></div>
  <h2 id="reviews">Đánh giá khách hàng</h2>${reviewsHtml(p, rv)}
  <h2>Sản phẩm liên quan</h2><div class="grid">${rel.map(card).join('')}</div>`;
@@ -763,7 +763,7 @@ function ordersV() {
 
 function wishV() {
   const l = (db.wish[key()] || []).map(P).filter(Boolean);
-  return `<h1 style="margin-top:20px">Sản phẩm yêu thích</h1>${l.length ? `<div class="grid">${l.map(card).join('')}</div>` : '<div class="empty">Chưa có sản phẩm yêu thích.</div>'}`;
+  return `<h1 style="margin-top:20px">Sản phẩm yêu thích</h1>${l.length ? `<div class="grid">${l.map(p => window.Outfit ? `<div class="wcell">${card(p)}<button class="btn o s" data-a="outfit" data-p="${p.id}">Phối đồ với sản phẩm này</button></div>` : card(p)).join('')}</div>` : '<div class="empty">Chưa có sản phẩm yêu thích.</div>'}`;
 }
 
 function loginAs(u) {
