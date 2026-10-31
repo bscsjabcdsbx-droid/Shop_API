@@ -118,23 +118,38 @@ git push origin main
 - Doanh thu trên trang tổng quan do giao diện tính, chỉ cộng các đơn "Đã giao". Số liệu trên server (`/api/admin/stats`) không bị thay đổi.
 - Ảnh tải lên lưu trong `public/uploads/`. Trên Render gói miễn phí, ổ đĩa bị xóa mỗi lần deploy lại, nên hãy dán đường dẫn ảnh từ dịch vụ lưu trữ ảnh hoặc gắn Persistent Disk.
 
-## 10. Cách chạy model CatVTON_AI
-  Mở CMD
-  chạy 3 lệnh sau
-    conda activate catvton311
-    cd "D:\Project 1\CatVTON-edited\CatVTON-AI"
-    .\start_api.bat
+## 10. Quy trình 
+  Bước 1. Khởi động CatVTON API
+    Mở Anaconda Prompt hoặc PowerShell và chạy:
+      cd "D:\Project 1\CatVTON-edited\CatVTON-AI"
+      conda activate catvton311
+      python api_server.py
 
-  Mở cửa số CMD mới và chạy
-    cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000
+    - Chờ API khởi động hoàn tất.
+    - Giữ cửa sổ này mở.
+    - Không tắt cửa sổ khi muốn website sử dụng tính năng thử đồ.
+  Bước 2. Khởi động Cloudflare Tunnel
+    Mở một cửa sổ PowerShell mới, chạy:
+      cloudflared tunnel --url http://127.0.0.1:8000
 
-  Cloudflare sẽ cấp một địa chỉ dạng: https://xxxxx.trycloudflare.com
+    Cloudflare sẽ cung cấp URL dạng:
+    https://ten-ngau-nhien.trycloudflare.com
 
-  Vào Render.com → Backend Web Service của Shop_API → Environment
+    Giữ cửa sổ này mở.
+  Bước 3. Kiểm tra kết nối
+    Mở URL sau trên trình duyệt:
+      https://shop-api-1-gvf9.onrender.com/api/try-on/config
 
-  Kiểm tra hai biến:
+    Nếu kết quả có:
+    {
+      "enabled": true,
+      "online": true,
+      "ready": true
+    }
 
-  CATVTON_API_URL	Địa chỉ HTTPS Cloudflare vừa tạo
-  CATVTON_API_KEY	API key phải trùng với cấu hình của CatVTON
+    thì backend đang nhận diện máy chủ AI là hoạt động.
+  Bước 4. Nếu URL Tunnel thay đổi
+    Nếu Cloudflare cấp URL mới, bạn cần cập nhật biến môi trường CATVTON_API_URL trên Render thành:
+    https://ten-ngau-nhien.trycloudflare.com
 
-  Nếu địa chỉ tunnel thay đổi, cập nhật lại CATVTON_API_URL, lưu và chờ Render khởi động lại backend.
+    Sau đó lưu thay đổi và chờ Render deploy/restart hoàn tất.
