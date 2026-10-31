@@ -335,12 +335,13 @@ Mỗi lần bật máy và muốn sử dụng thử đồ AI, thực hiện các
 
 ### Bước 1. Khởi động CatVTON API
 
-Mở Anaconda Prompt hoặc PowerShell và chạy:
+Mở Anaconda Prompt hoặc CMD và chạy:
 
-``` powershell
-cd "D:\Project 1\CatVTON-edited\CatVTON-AI"
+``` CMD
+cd "D:\Project 1\CatVTON-AI"
+d:
 conda activate catvton311
-python api_server.py
+start_api.bat
 ```
 
 -   Chờ API khởi động hoàn tất.
@@ -364,7 +365,31 @@ https://ten-ngau-nhien.trycloudflare.com
 Giữ cửa sổ Tunnel mở. Đây là đường kết nối để backend Render gọi đến máy
 chủ AI đang chạy trên máy tính cá nhân.
 
-### Bước 3. Kiểm tra trạng thái kết nối
+### Bước 3. Cập nhật URL nếu Cloudflare cấp URL mới
+
+Quick Tunnel có thể tạo URL mới sau khi khởi động lại. Nếu URL thay đổi:
+
+1.  Sao chép URL `https://...trycloudflare.com` mới từ cửa sổ Cloudflare
+    Tunnel.
+
+2.  Mở trang quản lý dịch vụ backend trên Render.
+
+3.  Vào phần **Environment**.
+
+4.  Cập nhật biến `CATVTON_API_URL` thành URL mới, ví dụ:
+
+    ``` text
+    CATVTON_API_URL=https://ten-ngau-nhien.trycloudflare.com
+    ```
+
+5.  Lưu thay đổi và chờ Render khởi động lại/deploy hoàn tất.
+
+6.  Mở lại endpoint kiểm tra trạng thái ở Bước 3.
+
+**Không** thêm đường dẫn `/health` vào cuối `CATVTON_API_URL`, trừ khi
+cấu hình của phiên bản backend yêu cầu rõ điều đó.
+
+### Bước 4. Kiểm tra trạng thái kết nối
 
 Mở đường dẫn sau trên trình duyệt:
 
@@ -388,30 +413,6 @@ Khi cấu hình và kết nối hoạt động, kết quả dự kiến có các
 
 Đây là kiểm tra trạng thái cấu hình. Để chắc chắn toàn bộ luồng hoạt
 động, hãy đăng nhập website và thử một lượt thử đồ.
-
-### Bước 4. Cập nhật URL nếu Cloudflare cấp URL mới
-
-Quick Tunnel có thể tạo URL mới sau khi khởi động lại. Nếu URL thay đổi:
-
-1.  Sao chép URL `https://...trycloudflare.com` mới từ cửa sổ Cloudflare
-    Tunnel.
-
-2.  Mở trang quản lý dịch vụ backend trên Render.
-
-3.  Vào phần **Environment**.
-
-4.  Cập nhật biến `CATVTON_API_URL` thành URL mới, ví dụ:
-
-    ``` text
-    CATVTON_API_URL=https://ten-ngau-nhien.trycloudflare.com
-    ```
-
-5.  Lưu thay đổi và chờ Render khởi động lại/deploy hoàn tất.
-
-6.  Mở lại endpoint kiểm tra trạng thái ở Bước 3.
-
-**Không** thêm đường dẫn `/health` vào cuối `CATVTON_API_URL`, trừ khi
-cấu hình của phiên bản backend yêu cầu rõ điều đó.
 
 ### Những việc không cần làm lại mỗi lần bật máy
 
