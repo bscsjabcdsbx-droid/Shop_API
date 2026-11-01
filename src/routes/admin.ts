@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { attachCoupons, releaseCoupon } from "../coupon.js";
 import { db, HttpError, requireAdmin, requireAuth, wrap } from "../lib.js";
+import { bookingOut, dateStr, todayVN } from "./bookings.js";
 
 const r = Router();
 r.use(requireAuth, requireAdmin);
@@ -288,6 +289,51 @@ r.post("/chat/:userId/messages", wrap(async (req, res) => {
     select: { id: true, fromAdmin: true, body: true, createdAt: true },
   });
   res.status(201).json(m);
+}));
+
+
+// ===== Đặt lịch stylist =====
+// range: upcoming (mặc định, ngày gần nhất → xa nhất) | past (đã qua, gần nhất trước) | all (sắp tới rồi tới đã qua)
+// date: một ngày cụ thể (YYYY-MM-DD), sắp theo giờ tăng dần. status: PENDING | CONFIRMED | CANCELLED
+r.get("/bookings", wrap(async (req, res) => {
+  const q = z.object({
+    range: z.enum(["upcoming", "past", "all"]).default("upcoming"),
+    date: dateStr.optional(),
+    status: z.enum(["PENDING", "CONFIRMED", "CANCELLED"]).optional(),
+  }).parse({ range: req.query.range || undefined, date: req.query.date || undefined, status: req.query.status || undefined });
+  const base = q.status ? { status: q.status } : {};
+  const incl = { user: { select: { email: true } } };
+  const shape = (b: Parameters<typeof bookingOut>[0] & { user: { email: string } }) => ({ ...bookingOut(b), email: b.user.email });
+  const asc = [{ date: "asc" as const }, { time: "asc" as const }];
+  const desc = [{ date: "desc" as const }, { time: "desc" as const }];
+  const today = todayVN();
+  if (q.date) return res.json((await db.booking.findMany({ where: { ...base, date: q.date }, orderBy: asc, include: incl, take: 500 })).map(shape));
+  const upcoming = q.range !== "past" ? await db.booking.findMany({ where: { ...base, date: { gte: today } }, orderBy: asc, include: incl, take: 500 }) : [];
+  const past = q.range !== "upcoming" ? await db.booking.findMany({ where: { ...base, date: { lt: today } }, orderBy: desc, include: incl, take: 500 }) : [];
+  res.json([...upcoming, ...past].map(shape));
+}));
+
+r.post("/bookings/:id/confirm", wrap(async (req, res) => {
+  const id = z.coerce.number().int().positive().parse(req.params.id);
+  const b = await db.booking.findUnique({ where: { id } });
+  if (!b) throw new HttpError(404, "Không tìm thấy lịch hẹn");
+  if (b.status === "CANCELLED") throw new HttpError(400, "Lịch này đã bị hủy");
+  if (b.status === "CONFIRMED") throw new HttpError(400, "Lịch này đã được xác nhận");
+  const [u] = await db.$transaction([
+    db.booking.update({ where: { id }, data: { status: "CONFIRMED", confirmedAt: new Date() }, include: { user: { select: { email: true } } } }),
+    // Báo cho khách ngay trong khung chat
+    db.chatMessage.create({ data: { userId: b.userId, fromAdmin: true, readByAdmin: true, body: `✅ Lịch hẹn stylist của bạn đã được xác nhận: ${b.date.split("-").reverse().join("/")} lúc ${b.time} (${b.mode}). Hẹn gặp bạn!` } }),
+  ]);
+  res.json({ ...bookingOut(u), email: u.user.email });
+}));
+
+r.post("/bookings/:id/cancel", wrap(async (req, res) => {
+  const id = z.coerce.number().int().positive().parse(req.params.id);
+  const b = await db.booking.findUnique({ where: { id } });
+  if (!b) throw new HttpError(404, "Không tìm thấy lịch hẹn");
+  if (b.status === "CANCELLED") throw new HttpError(400, "Lịch này đã bị hủy");
+  const u = await db.booking.update({ where: { id }, data: { status: "CANCELLED" }, include: { user: { select: { email: true } } } });
+  res.json({ ...bookingOut(u), email: u.user.email });
 }));
 
 export default r;

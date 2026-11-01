@@ -16,6 +16,7 @@
    13. ĐIỀU HƯỚNG & VẼ TRANG
    14. XỬ LÝ SỰ KIỆN (nút bấm, form, bàn phím)
    15. MÃ GIẢM GIÁ (khách nhập khi thanh toán, admin tạo và quản lý)
+   15b. ĐẶT LỊCH STYLIST (khách đặt, admin lọc theo ngày và xác nhận)
    16. CHAT TRỰC TIẾP (khách với admin, polling)
    17. KHỞI ĐỘNG
    ========================================================================== */
@@ -149,7 +150,11 @@ let db,
     open: null,
     aq: '',
     as: '',
-    cq: ''
+    cq: '',
+    bkr: 'upcoming',
+    bkd: '',
+    bks: '',
+    resetTok: ''
   };
 
 let save = () => {
@@ -747,8 +752,14 @@ function placeOrder() {
    ========================================================================== */
 
 function authV() {
+  if (S.arg === 'forgot')
+    return `<div style="max-width:420px;margin:40px auto" class="box"><h1 style="font-size:22px">Quên mật khẩu</h1><p class="mut">Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết để bạn đặt mật khẩu mới.</p><div class="fld"><label for="a_e">Email</label><input id="a_e" type="email" autocomplete="email"></div><div class="err" id="aerr"></div><p class="mut" id="amsg" role="status"></p><button class="btn" style="width:100%" data-a="forgot">Gửi liên kết đặt lại mật khẩu</button><p class="mut" style="text-align:center"><a class="lnk" data-a="go" data-p="auth:login" style="text-decoration:underline">Quay lại đăng nhập</a></p></div>`;
+  if (S.arg === 'reset')
+    return S.resetTok
+      ? `<div style="max-width:420px;margin:40px auto" class="box"><h1 style="font-size:22px">Đặt lại mật khẩu</h1><div class="fld"><label for="r_p">Mật khẩu mới (tối thiểu 8 ký tự)</label>${pwf('r_p', ` autocomplete="new-password"`)}</div><div class="fld"><label for="r_p2">Nhập lại mật khẩu mới</label>${pwf('r_p2', ` autocomplete="new-password"`)}</div><div class="err" id="aerr"></div><button class="btn" style="width:100%" data-a="doreset">Đặt lại mật khẩu</button></div>`
+      : `<div style="max-width:420px;margin:40px auto" class="box"><h1 style="font-size:22px">Đặt lại mật khẩu</h1><p class="err">Liên kết không hợp lệ hoặc đã hết hạn.</p><button class="btn" data-a="go" data-p="auth:forgot">Gửi lại liên kết</button></div>`;
   const reg = S.arg === 'register';
-  return `<div style="max-width:420px;margin:40px auto" class="box"><h1 style="font-size:22px">${reg ? 'Đăng ký' : 'Đăng nhập'}</h1>${reg ? '<div class="fld"><label for="a_n">Họ tên</label><input id="a_n"></div>' : ''}<div class="fld"><label for="a_e">Email</label><input id="a_e" type="email" autocomplete="off"></div><div class="fld"><label for="a_p">Mật khẩu</label>${pwf('a_p', ` autocomplete="new-password"`)}</div><div class="err" id="aerr"></div><button class="btn" style="width:100%" data-a="${reg ? 'reg' : 'login'}">${reg ? 'Tạo tài khoản' : 'Đăng nhập'}</button><p class="mut" style="text-align:center">${reg ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'} <a class="lnk" data-a="go" data-p="auth:${reg ? 'login' : 'register'}" style="text-decoration:underline">${reg ? 'Đăng nhập' : 'Đăng ký'}</a></p>${reg ? '' : '<p class="mut" style="font-size:12px;text-align:center"></p>'}</div>`;
+  return `<div style="max-width:420px;margin:40px auto" class="box"><h1 style="font-size:22px">${reg ? 'Đăng ký' : 'Đăng nhập'}</h1>${reg ? '<div class="fld"><label for="a_n">Họ tên</label><input id="a_n"></div>' : ''}<div class="fld"><label for="a_e">Email</label><input id="a_e" type="email" autocomplete="off"></div><div class="fld"><label for="a_p">Mật khẩu</label>${pwf('a_p', ` autocomplete="new-password"`)}</div>${reg ? '' : '<p style="text-align:right;margin:-4px 0 10px"><a class="lnk" data-a="go" data-p="auth:forgot" style="text-decoration:underline">Quên mật khẩu?</a></p>'}<div class="err" id="aerr"></div><button class="btn" style="width:100%" data-a="${reg ? 'reg' : 'login'}">${reg ? 'Tạo tài khoản' : 'Đăng nhập'}</button><p class="mut" style="text-align:center">${reg ? 'Đã có tài khoản?' : 'Chưa có tài khoản?'} <a class="lnk" data-a="go" data-p="auth:${reg ? 'login' : 'register'}" style="text-decoration:underline">${reg ? 'Đăng nhập' : 'Đăng ký'}</a></p>${reg ? '' : '<p class="mut" style="font-size:12px;text-align:center"></p>'}</div>`;
 }
 
 function profile() {
@@ -798,12 +809,13 @@ function admin() {
     ['acol', 'Bộ sưu tập'],
     ['aord', 'Đơn hàng'],
     ['acp', 'Mã giảm giá'],
+    ['abk', 'Đặt lịch'],
     ['achat', 'Tin nhắn'],
     ['acus', 'Khách hàng']
   ];
   return (
-    `<div class="tabs">${tabs.map(t => `<button class="chip${S.adm === t[0] ? ' on' : ''}" data-a="atab" data-p="${t[0]}">${t[1]}${t[0] === 'achat' && CH.ad.unread ? ` <span class="cnt2">${CH.ad.unread}</span>` : ''}</button>`).join('')}</div>` +
-    { dash: dash, aprod: aprod, aord: aord, acus: acus, acol: acol, acp: acp, achat: achat }[S.adm]()
+    `<div class="tabs">${tabs.map(t => `<button class="chip${S.adm === t[0] ? ' on' : ''}" data-a="atab" data-p="${t[0]}">${t[1]}${t[0] === 'achat' && CH.ad.unread ? ` <span class="cnt2">${CH.ad.unread}</span>` : t[0] === 'abk' && BK.pending ? ` <span class="cnt2">${BK.pending}</span>` : ''}</button>`).join('')}</div>` +
+    { dash: dash, aprod: aprod, aord: aord, acus: acus, acol: acol, acp: acp, abk: abk, achat: achat }[S.adm]()
   );
 }
 
@@ -1100,7 +1112,9 @@ function setNav() {
           ? 'products'
           : S.view === 'orders'
             ? 'orders'
-            : '';
+            : S.view === 'stylist'
+              ? 'stylist'
+              : '';
   document.querySelectorAll('[data-nav]').forEach(e => e.classList.toggle('on', e.dataset.nav === k));
 }
 
@@ -1162,7 +1176,9 @@ function render() {
     orders: ordersV,
     wish: wishV,
     admin,
-    col: colView
+    col: colView,
+    faq: () => (window.Pages ? Pages.faq() : home()),
+    stylist: () => (window.Pages ? Pages.stylist() : home())
   };
   if (['profile', 'orders', 'checkout'].includes(S.view) && !user()) {
     S.after = S.view;
@@ -1181,7 +1197,9 @@ function render() {
     products: 'Sản phẩm — MONO',
     cart: 'Giỏ hàng — MONO',
     checkout: 'Thanh toán — MONO',
-    admin: 'Quản trị — MONO'
+    admin: 'Quản trị — MONO',
+    faq: 'Câu hỏi thường gặp — MONO',
+    stylist: 'Đặt lịch Stylist — MONO'
   };
   document.title = S.view === 'detail' && P(S.arg) ? P(S.arg).name + ' — MONO' : t[S.view] || 'MONO';
   setNav();
@@ -1681,6 +1699,13 @@ document.addEventListener('change', e => {
   }
   if (t.dataset.f) {
     const k = t.dataset.f;
+    if (k === 'bkr' || k === 'bkd' || k === 'bks') {
+      S[k] = t.value;
+      if (k === 'bkd' && t.value) S.bkr = 'all';
+      render();
+      bkReload();
+      return;
+    }
     if (k === 'aq' || k === 'as' || k === 'cq') {
       S[k] = t.value;
     } else {
@@ -1891,6 +1916,90 @@ Object.assign(A, {
       toast(x.message);
     }
   }
+});
+
+/* ==========================================================================
+  15b. ĐẶT LỊCH STYLIST (khách đặt, admin lọc theo ngày và xác nhận)
+   Giờ hẹn do khách tự chọn trong khoảng BK_OPEN – BK_CLOSE.
+   ========================================================================== */
+const BK_OPEN = '08:00',
+  BK_CLOSE = '22:00',
+  BK = { pending: 0 };
+const BK_STAT = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Đã xác nhận', CANCELLED: 'Đã hủy' };
+const bkDmy = d => String(d).split('-').reverse().join('/');
+const bkToday = () => {
+  const d = new Date(),
+    p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+};
+
+/* Cổng dữ liệu đặt lịch: demo lưu trong trình duyệt, api.js ghi đè để gọi server */
+let bkReload = () => {};
+let bkAll = async () => (db.bookings || []).map(b => ({ ...b, email: (db.users.find(u => u.id === b.userId) || {}).email || '' }));
+let bkCreate = async d => {
+  const b = { id: (db.bkSeq = (db.bkSeq || 0) + 1), userId: db.session, status: 'PENDING', createdAt: Date.now(), note: null, ...d };
+  (db.bookings || (db.bookings = [])).push(b);
+  save();
+  return b;
+};
+let bkMine = async () => (db.bookings || []).filter(b => b.userId === db.session).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+let bkSetStatus = async (id, status) => {
+  const b = (db.bookings || []).find(x => x.id == id);
+  if (b) b.status = status;
+  save();
+  return b;
+};
+let bkCancelMine = async id => bkSetStatus(id, 'CANCELLED');
+
+/* Lọc và sắp xếp danh sách của admin: sắp tới (gần → xa), đã qua (gần nhất trước), hoặc một ngày cụ thể */
+function bkFiltered() {
+  const today = bkToday(),
+    key = b => b.date + ' ' + b.time;
+  let l = (db.bookings || []).filter(b => !S.bks || b.status === S.bks);
+  if (S.bkd) return l.filter(b => b.date === S.bkd).sort((a, b) => key(a).localeCompare(key(b)));
+  const up = l.filter(b => b.date >= today).sort((a, b) => key(a).localeCompare(key(b))),
+    past = l.filter(b => b.date < today).sort((a, b) => key(b).localeCompare(key(a)));
+  return S.bkr === 'past' ? past : S.bkr === 'all' ? [...up, ...past] : up;
+}
+
+function abk() {
+  const l = bkFiltered(),
+    today = bkToday();
+  const row = b =>
+    `<div class="box" style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><div><b>${esc(bkDmy(b.date))} · ${esc(b.time)}</b>${b.date === today ? ' <span class="badge">Hôm nay</span>' : ''} <span class="badge${b.status === 'CONFIRMED' ? ' c4' : b.status === 'CANCELLED' ? ' c5' : ''}">${BK_STAT[b.status] || b.status}</span><br>${esc(b.name)} · <a class="lk" href="tel:${esc(b.phone)}">${esc(b.phone)}</a>${b.email ? ' · <span class="mut">' + esc(b.email) + '</span>' : ''}<br><span class="mut">${esc(b.mode)} · ${esc(b.topic)}${b.note ? ' · Ghi chú: ' + esc(b.note) : ''}</span></div><div class="row">${b.status === 'PENDING' ? `<button class="btn s" data-a="bkok" data-p="${b.id}">Xác nhận</button>` : ''}${b.status !== 'CANCELLED' ? `<button class="btn d s" data-a="bkno" data-p="${b.id}">Hủy lịch</button>` : ''}</div></div></div>`;
+  return `<div class="row" style="margin-bottom:12px"><select data-f="bkr" style="width:auto" aria-label="Khoảng thời gian"><option value="upcoming"${S.bkr === 'upcoming' ? ' selected' : ''}>Sắp tới (gần → xa)</option><option value="past"${S.bkr === 'past' ? ' selected' : ''}>Đã qua</option><option value="all"${S.bkr === 'all' ? ' selected' : ''}>Tất cả</option></select><input type="date" data-f="bkd" value="${esc(S.bkd)}" style="width:auto" aria-label="Lọc theo ngày">${S.bkd ? '<button class="btn o s" data-a="bkclear">Bỏ lọc ngày</button>' : ''}<select data-f="bks" style="width:auto" aria-label="Trạng thái"><option value="">Mọi trạng thái</option>${Object.keys(BK_STAT).map(k => `<option value="${k}"${S.bks === k ? ' selected' : ''}>${BK_STAT[k]}</option>`).join('')}</select><span class="mut">${l.length} lịch hẹn</span></div>${l.map(row).join('') || '<div class="empty">Không có lịch hẹn.</div>'}`;
+}
+
+Object.assign(A, {
+  bkok: async p => {
+    try {
+      await bkSetStatus(p, 'CONFIRMED');
+      toast('Đã xác nhận lịch hẹn');
+    } catch (e) {
+      toast(e.message);
+    }
+    bkReload();
+    render();
+  },
+  bkno: async p => {
+    if (!confirm('Hủy lịch hẹn này?')) return;
+    try {
+      await bkSetStatus(p, 'CANCELLED');
+      toast('Đã hủy lịch hẹn');
+    } catch (e) {
+      toast(e.message);
+    }
+    bkReload();
+    render();
+  },
+  bkclear: () => {
+    S.bkd = '';
+    render();
+    bkReload();
+  },
+  /* Quên mật khẩu / đặt lại mật khẩu (api.js ghi đè để gọi server) */
+  forgot: () => ($('#aerr').textContent = 'Quên mật khẩu cần kết nối máy chủ, chế độ demo chưa hỗ trợ.'),
+  doreset: () => ($('#aerr').textContent = 'Đặt lại mật khẩu cần kết nối máy chủ, chế độ demo chưa hỗ trợ.')
 });
 
 /* ==========================================================================
@@ -2151,7 +2260,16 @@ setInterval(chatLoop, 3000);
 
 addEventListener('DOMContentLoaded', () =>
   (window.MONO_BOOT || init)()
-    .then(render)
+    .then(() => {
+      const t = new URLSearchParams(location.search).get('reset');
+      if (t) {
+        S.resetTok = /^[0-9a-f]{64}$/.test(t) ? t : '';
+        S.view = 'auth';
+        S.arg = 'reset';
+        history.replaceState(null, '', location.pathname);
+      }
+      render();
+    })
     .catch(e => {
       $('#main').innerHTML = '<div class="empty">Không thể khởi tạo dữ liệu: ' + esc(e.message) + '</div>';
     })

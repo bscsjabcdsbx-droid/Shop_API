@@ -17,6 +17,7 @@
 <nav id="nav" aria-label="Điều hướng chính">
 <a data-a="go" data-p="home" data-nav="home" tabindex="0">Trang chủ</a>
 <a data-a="allp" data-nav="products" tabindex="0">Sản phẩm</a>
+<a data-a="go" data-p="stylist" data-nav="stylist" tabindex="0">Đặt lịch Stylist</a>
 <a data-a="go" data-p="orders" data-nav="orders" tabindex="0">Đơn hàng</a>
 </nav>
 <span class="sp"></span>
@@ -28,9 +29,9 @@
 <main id="main" class="wrap"></main>
 <footer><div class="wrap"><div class="fg">
 <div><b style="letter-spacing:.18em">NSHV</b><p>Thời trang tối giản, chất liệu tốt, form chuẩn. Mặc đẹp mỗi ngày mà không cần cầu kỳ.</p></div>
-<div><h4>Danh mục</h4><ul><li>Áo</li><li>Quần</li><li>Váy</li><li>Áo khoác</li></ul></div>
-<div><h4>Chính sách</h4><ul><li>Đổi trả 7 ngày</li><li>Miễn phí ship từ 500.000₫</li><li>Bảo mật thông tin</li></ul></div>
-<div><h4>Liên hệ</h4><ul><li>hello@NSHV.vn</li><li>1900 0000</li><li>Facebook · Instagram</li></ul></div>
+<div><h4>Danh mục</h4><ul><li><button type="button" class="lk" data-a="cat" data-p="ao">Áo</button></li><li><button type="button" class="lk" data-a="cat" data-p="quan">Quần</button></li><li><button type="button" class="lk" data-a="cat" data-p="vay">Váy</button></li><li><button type="button" class="lk" data-a="cat" data-p="khoac">Áo khoác</button></li></ul></div>
+<div><h4>Chính sách &amp; hỗ trợ</h4><ul><li><button type="button" class="lk" data-a="go" data-p="faq:doi-tra">Đổi trả 7 ngày</button></li><li><button type="button" class="lk" data-a="go" data-p="faq:phi-ship">Miễn phí ship từ 500.000₫</button></li><li><button type="button" class="lk" data-a="go" data-p="faq:bao-mat">Bảo mật thông tin</button></li><li><button type="button" class="lk" data-a="go" data-p="faq">Câu hỏi thường gặp</button></li><li><button type="button" class="lk" data-a="go" data-p="stylist">Đặt lịch Stylist</button></li></ul></div>
+<div><h4>Liên hệ</h4><ul id="ftc"><li>Hotline: <a class="lk" href="tel:19000000">1900 0000</a></li><li>Email: <a class="lk" href="mailto:hello@NSHV.vn">hello@NSHV.vn</a></li><li><a class="lk" href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer">Facebook</a> · <a class="lk" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram</a></li></ul></div>
 </div><p style="text-align:center;margin-top:24px">© 2026 NSHV.</p></div></footer>
 
 <nav class="bnav" id="bnav" aria-label="Điều hướng nhanh">
@@ -50,5 +51,6 @@
 <script src="api.js"></script>
 <script src="tryon.js"></script>
 <script src="outfit.js"></script>
+<script src="pages.js"></script>
 </body>
 </html>

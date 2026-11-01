@@ -240,16 +240,26 @@
       if (S.view === 'detail') render();
     } catch (e) {}
   }
+  /* Số lịch đặt đang chờ xác nhận (chấm số trên tab "Đặt lịch") */
+  async function loadBkPending() {
+    BK.pending = (await rq('/admin/bookings?range=all&status=PENDING')).length;
+  }
   async function loadAdmin() {
     try {
       if (S.adm === 'dash') {
         S.stats = await rq('/admin/stats');
+        loadBkPending().catch(() => {});
         db.orders = (await rq('/admin/orders')).map(mapO);
       } else if (S.adm === 'aprod') {
         db.products = (await rq('/admin/products')).map(mapP);
         ADMIN_P = true;
       } else if (S.adm === 'aord') db.orders = (await rq('/admin/orders')).map(mapO);
       else if (S.adm === 'acp') db.coupons = await rq('/admin/coupons');
+      else if (S.adm === 'abk') {
+        const q = S.bkd ? 'date=' + encodeURIComponent(S.bkd) : 'range=' + S.bkr;
+        db.bookings = await rq('/admin/bookings?' + q + (S.bks ? '&status=' + S.bks : ''));
+        await loadBkPending();
+      }
       else if (S.adm === 'acol' && SERVER_COLS) db.collections = (await rq('/admin/collections')).map(mapCol);
       else if (S.adm === 'acus') {
         db.orders = (await rq('/admin/orders')).map(mapO);
@@ -427,6 +437,34 @@
       if (p.length < 8) return (er.textContent = 'Mật khẩu tối thiểu 8 ký tự');
       try {
         await afterAuth(await rq('/auth/register', { method: 'POST', body: { email: e, password: p, name: n } }));
+      } catch (x) {
+        er.textContent = x.message;
+      }
+    };
+    A.forgot = async () => {
+      const e = $('#a_e').value.trim().toLowerCase(),
+        er = $('#aerr'),
+        m = $('#amsg');
+      er.textContent = '';
+      m.textContent = '';
+      if (!/^\S+@\S+\.\S+$/.test(e)) return (er.textContent = 'Email không hợp lệ');
+      try {
+        m.textContent = (await rq('/auth/forgot-password', { method: 'POST', body: { email: e } })).message;
+      } catch (x) {
+        er.textContent = x.status === 404 ? 'Máy chủ chưa hỗ trợ quên mật khẩu. Hãy cập nhật backend.' : x.message;
+      }
+    };
+    A.doreset = async () => {
+      const p = $('#r_p').value,
+        er = $('#aerr');
+      er.textContent = '';
+      if (p.length < 8) return (er.textContent = 'Mật khẩu tối thiểu 8 ký tự');
+      if (p !== $('#r_p2').value) return (er.textContent = 'Hai mật khẩu không khớp');
+      try {
+        await rq('/auth/reset-password', { method: 'POST', body: { token: S.resetTok, password: p } });
+        S.resetTok = '';
+        toast('Đã đặt lại mật khẩu, hãy đăng nhập bằng mật khẩu mới');
+        go('auth', 'login');
       } catch (x) {
         er.textContent = x.message;
       }
@@ -804,6 +842,22 @@
     achUnread = async () => (await rq('/admin/chat/unread')).count;
   }
 
+  /* --- 5.12 Đặt lịch stylist: khách đặt, admin lọc và xác nhận --- */
+  function patchBookings() {
+    bkReload = () => {
+      if (S.view === 'admin' && S.adm === 'abk') loadAdmin();
+    };
+    bkCreate = d => rq('/bookings', { method: 'POST', body: d });
+    bkMine = () => rq('/bookings');
+    bkCancelMine = id => rq('/bookings/' + id + '/cancel', { method: 'POST' });
+    bkSetStatus = async (id, status) => {
+      const b = await rq('/admin/bookings/' + id + (status === 'CONFIRMED' ? '/confirm' : '/cancel'), { method: 'POST' });
+      const i = (db.bookings || []).findIndex(x => x.id == id);
+      if (i >= 0) db.bookings[i] = b;
+      return b;
+    };
+  }
+
   function install() {
     patchCore();
     patchCart();
@@ -816,6 +870,7 @@
     patchDashboard();
     patchCoupons();
     patchChat();
+    patchBookings();
   }
 
   /* ==========================================================================

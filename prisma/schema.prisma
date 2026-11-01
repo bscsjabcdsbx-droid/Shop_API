@@ -36,6 +36,8 @@ model User {
   wishlist     Wishlist[]
   chatMessages ChatMessage[]
   tryOnJobs    TryOnJob[]
+  bookings     Booking[]
+  passwordResets PasswordReset[]
 }
 
 model Category {
@@ -286,4 +288,45 @@ model TryOnJob {
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+// ===== Đặt lịch gặp stylist =====
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model Booking {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  name        String
+  phone       String
+  mode        String
+  topic       String
+  note        String?
+  // Ngày hẹn dạng "YYYY-MM-DD" và giờ hẹn dạng "HH:mm" (giờ Việt Nam, 08:00–22:00)
+  date        String
+  time        String
+  status      BookingStatus @default(PENDING)
+  confirmedAt DateTime?
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([date, time])
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ===== Quên mật khẩu: chỉ lưu mã băm (SHA-256) của token, token dùng 1 lần, hết hạn sau 30 phút =====
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
