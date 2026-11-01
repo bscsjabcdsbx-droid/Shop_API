@@ -861,7 +861,7 @@ function dash() {
 function aprod() {
   const q = S.aq.toLowerCase(),
     l = db.products.filter(p => !q || p.name.toLowerCase().includes(q));
-  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}${p.active === false ? ' <span class="badge">Đã ẩn</span>' : ''}</div></td><td>${CATS.find(c => c[0] === p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${Object.values(p.stock).reduce((a, b) => a + b, 0)}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
+  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}${p.active === false ? ' <span class="badge">Đã ẩn</span>' : ''}</div></td><td>${CATS.find(c => c[0] === p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${(t => (t > 0 ? t : '<span class="badge c5">Hết hàng</span>'))(Object.values(p.stock).reduce((a, b) => a + b, 0))}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
 }
 
 function aord() {
@@ -953,6 +953,49 @@ async function addColFiles(files) {
   }
 }
 
+/* --- Quản lý tồn kho trong form sửa sản phẩm --- */
+const skBadge = n =>
+  n > 0
+    ? `<span class="badge c4">Còn hàng</span>`
+    : `<span class="badge c5">Hết hàng</span>`;
+
+function stockGrid(p) {
+  const keys = [];
+  p.sizes.forEach(s => p.colors.forEach(c => keys.push(s + '|' + c)));
+  const total = keys.reduce((a, k) => a + (p.stock[k] || 0), 0);
+  return `<div class="fld" id="m_stock"><label>Tồn kho theo size / màu <span class="mut">(đặt 0 = hết hàng; nhập số &gt; 0 để có hàng trở lại)</span></label>
+<div class="row" style="margin-bottom:8px"><input id="m_ka" type="number" min="0" placeholder="Số lượng" style="max-width:120px"><button type="button" class="btn s o" data-a="skall">Đặt cho tất cả</button><button type="button" class="btn s o" data-a="skzero" data-p="*">Hết hàng tất cả</button><span class="mut" id="m_kt">Tổng: ${total}</span></div>
+<div class="tw"><table><tr><th>Size</th><th>Màu</th><th>Số lượng</th><th>Trạng thái</th><th></th></tr>${keys
+    .map(k => {
+      const [sz, cl] = k.split('|'),
+        n = p.stock[k] || 0;
+      return `<tr><td>${esc(sz)}</td><td>${esc(cl)}</td><td><input type="number" min="0" step="1" data-sk="${esc(k)}" value="${n}" style="max-width:100px" aria-label="Tồn kho ${esc(sz)} ${esc(cl)}"></td><td data-sb="${esc(k)}">${skBadge(n)}</td><td><button type="button" class="btn s o" data-a="skzero" data-p="${esc(k)}">Hết hàng</button></td></tr>`;
+    })
+    .join('')}</table></div><p class="mut" style="margin:4px 0">Nếu đổi danh sách size/màu ở trên, biến thể mới sẽ dùng số lượng ở ô "Tồn kho biến thể mới" bên dưới.</p></div>`;
+}
+
+/* Đọc số lượng admin đã nhập trong bảng tồn kho: { 'S|Đen': 5, ... } */
+function readStockInputs() {
+  const m = {};
+  document.querySelectorAll('[data-sk]').forEach(i => {
+    m[i.dataset.sk] = Math.max(0, Math.floor(+i.value) || 0);
+  });
+  return m;
+}
+
+/* Cập nhật huy hiệu trạng thái + tổng sau khi admin sửa số lượng */
+function skRefresh() {
+  let total = 0;
+  document.querySelectorAll('[data-sk]').forEach(i => {
+    const n = Math.max(0, Math.floor(+i.value) || 0);
+    total += n;
+    const b = [...document.querySelectorAll('[data-sb]')].find(x => x.dataset.sb === i.dataset.sk);
+    if (b) b.innerHTML = skBadge(n);
+  });
+  const t = $('#m_kt');
+  if (t) t.textContent = 'Tổng: ' + total;
+}
+
 function pform(p) {
   const n = !p;
   p = p || {
@@ -965,7 +1008,7 @@ function pform(p) {
     colors: ['Đen', 'Trắng'],
     stock: {}
   };
-  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu (Đen, Trắng, Xám)</label><input id="m_l" value="${p.colors.join(',')}"></div></div><div class="fld"><label>Tồn kho mỗi biến thể (biến thể mới)</label><input id="m_k" type="number" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
+  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu (Đen, Trắng, Xám)</label><input id="m_l" value="${p.colors.join(',')}"></div></div>${n ? '' : stockGrid(p)}<div class="fld"><label>${n ? 'Tồn kho mỗi biến thể' : 'Tồn kho cho biến thể mới (khi thêm size/màu)'}</label><input id="m_k" type="number" min="0" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
 }
 
 function pimgsHtml() {
@@ -1499,13 +1542,18 @@ Object.assign(A, {
     if (!sizes.length || !colors.length)
       return (er.textContent = 'Cần ít nhất 1 size và 1 màu hợp lệ (Đen, Trắng, Xám)');
     const old = +p ? P(p) : null,
+      edited = readStockInputs(),
       stock = {};
     sizes.forEach(s =>
-      colors.forEach(
-        c =>
-          (stock[s + '|' + c] =
-            old && old.stock[s + '|' + c] != null ? old.stock[s + '|' + c] : Math.max(0, +g('m_k') || 0))
-      )
+      colors.forEach(c => {
+        const k = s + '|' + c;
+        stock[k] =
+          edited[k] != null
+            ? edited[k]
+            : old && old.stock[k] != null
+              ? old.stock[k]
+              : Math.max(0, Math.floor(+g('m_k')) || 0);
+      })
     );
     const d = {
       name: g('m_n'),
@@ -1528,6 +1576,18 @@ Object.assign(A, {
     modal('');
     render();
     toast('Đã lưu sản phẩm');
+  },
+  skzero: p => {
+    document.querySelectorAll('[data-sk]').forEach(i => {
+      if (p === '*' || i.dataset.sk === p) i.value = 0;
+    });
+    skRefresh();
+  },
+  skall: () => {
+    const v = $('#m_ka').value;
+    if (v === '' || +v < 0) return toast('Nhập số lượng (≥ 0) để áp dụng');
+    document.querySelectorAll('[data-sk]').forEach(i => (i.value = Math.floor(+v)));
+    skRefresh();
   },
   pdel: p => {
     if (!confirm('Xóa sản phẩm này? Hành động không thể hoàn tác.')) return;
@@ -1687,6 +1747,10 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset.sk != null) {
+    skRefresh();
+    return;
+  }
   if (t.id === 'm_f') {
     addFiles([...t.files]);
     t.value = '';

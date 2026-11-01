@@ -604,12 +604,21 @@
         return (er.textContent = 'Cần ít nhất 1 size và 1 màu hợp lệ (Đen, Trắng, Xám)');
       const old = +p ? P(p) : null,
         sl = slug(g('m_n'));
+      const edited = readStockInputs();
       const variants = sizes.flatMap(s =>
-        colors.map(c => ({
-          size: s,
-          color: c,
-          stock: old && old.stock[s + '|' + c] != null ? old.stock[s + '|' + c] : Math.max(0, +g('m_k') || 0)
-        }))
+        colors.map(c => {
+          const k = s + '|' + c;
+          return {
+            size: s,
+            color: c,
+            stock:
+              edited[k] != null
+                ? edited[k]
+                : old && old.stock[k] != null
+                  ? old.stock[k]
+                  : Math.max(0, Math.floor(+g('m_k')) || 0)
+          };
+        })
       );
       const body = {
         name: g('m_n'),
