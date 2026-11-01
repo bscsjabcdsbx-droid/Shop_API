@@ -9,7 +9,7 @@
   const CONTACT = {
     phone: '1900 0000',
     email: 'hello@NSHV.vn',
-    facebook: 'https://www.facebook.com/', // TODO: thay bằng link fanpage thật của cửa hàng
+    facebook: 'https://www.facebook.com/buichaunamthai128208', // TODO: thay bằng link fanpage thật của cửa hàng
     instagram: 'https://www.instagram.com/' // TODO: thay bằng link Instagram thật của cửa hàng
   };
   const OPEN = '08:00', CLOSE = '22:00'; // khách tự chọn giờ hẹn trong khoảng này (server cũng kiểm tra lại)
@@ -220,7 +220,7 @@ ${live() ? '<p class="mut">Lịch chỉ chính thức khi cửa hàng xác nhậ
       ST.done = entry;
       ST.busy = false;
       ST.loadedAt = 0;
-      try { ST.list = await bkMine(); } catch (e) {}
+      try { ST.list = await bkMine(); } catch (e) { }
       repaint();
       scrollTo(0, 0);
     } catch (e) {
@@ -228,9 +228,9 @@ ${live() ? '<p class="mut">Lịch chỉ chính thức khi cửa hàng xác nhậ
       if (btn) { btn.disabled = false; btn.textContent = 'Gửi yêu cầu đặt lịch'; }
       fail(e && e.status === 429 ? 'Bạn đặt lịch quá nhiều, vui lòng thử lại sau ít phút.'
         : e && e.status === 401 ? 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
-        : e && e.status === 404 ? 'Máy chủ chưa hỗ trợ đặt lịch, vui lòng gọi ' + CONTACT.phone + '.'
-        : e && e.message && e.status ? e.message
-        : 'Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi ' + CONTACT.phone + '.');
+          : e && e.status === 404 ? 'Máy chủ chưa hỗ trợ đặt lịch, vui lòng gọi ' + CONTACT.phone + '.'
+            : e && e.message && e.status ? e.message
+              : 'Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi ' + CONTACT.phone + '.');
     }
   }
 
@@ -251,7 +251,7 @@ ${live() ? '<p class="mut">Lịch chỉ chính thức khi cửa hàng xác nhậ
       if (!confirm('Hủy yêu cầu đặt lịch này?')) return;
       try { await bkCancelMine(+v); toast('Đã hủy lịch hẹn'); } catch (x) { toast(x.message); }
       ST.loadedAt = 0;
-      try { ST.list = await bkMine(); } catch (x) {}
+      try { ST.list = await bkMine(); } catch (x) { }
       repaint();
     }
   });

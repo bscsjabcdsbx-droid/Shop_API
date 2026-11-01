@@ -60,7 +60,7 @@
         // Cập nhật nút trên trang chi tiết khi đã biết sản phẩm nào được hỗ trợ.
         if (typeof S !== 'undefined' && S.view === 'detail' && !document.getElementById('tryon')) render();
       }
-    } catch (e) {}
+    } catch (e) { }
     return T.cfg;
   }
   // null = chưa biết (vẫn hiện nút, backend quyết định), true/false nếu đã có cấu hình
@@ -303,7 +303,7 @@
     try {
       const r = await call('/active');
       if (r.ok) T.quota = (await r.json()).quota;
-    } catch (e) {}
+    } catch (e) { }
   }
 
   function poll() {
@@ -380,14 +380,14 @@
       const r = await call('/' + T.job.id, { method: 'DELETE' });
       const d = await json(r);
       if (d.job) T.job = d.job;
-    } catch (e) {}
+    } catch (e) { }
     afterStatus();
   }
 
   // Giải phóng ảnh kết quả trên máy AI khi người dùng đã xem xong (ảnh vẫn còn trong trang để tải về).
   function release(jobId) {
     if (!jobId || !live()) return;
-    call('/' + jobId, { method: 'DELETE' }).catch(() => {});
+    call('/' + jobId, { method: 'DELETE' }).catch(() => { });
   }
 
   async function restore() {
@@ -410,7 +410,7 @@
           return fetchResult();
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     paint();
   }
 

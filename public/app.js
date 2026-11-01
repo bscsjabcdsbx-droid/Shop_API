@@ -43,7 +43,7 @@ const CONFIG = {
     vay: 'images/categories/vay.jpg',
     khoac: 'images/categories/ao-khoac.jpg',
     pk: 'images/categories/phu-kien.jpg'
-}
+  }
 };
 
 /* ==========================================================================
@@ -187,7 +187,7 @@ const stars = r => '★'.repeat(Math.round(r)) + '☆'.repeat(5 - Math.round(r))
 async function init() {
   try {
     db = JSON.parse(localStorage.getItem(LS));
-  } catch (e) {}
+  } catch (e) { }
   if (db && db.v === 1) return;
   const A = await sha('Admin@12345'),
     K = await sha('Khach@12345');
@@ -356,7 +356,7 @@ function card(p) {
 }
 
 const EYE =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   EYE_OFF =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
 
@@ -521,21 +521,20 @@ function products() {
  <label>Giá (₫)</label><div class="f2"><input data-f="min" type="number" min="0" placeholder="Từ" value="${f.min}"><input data-f="max" type="number" min="0" placeholder="Đến" value="${f.max}"></div>
  <label>Size</label><div class="chips">${sizes.map(s => `<button class="chip${f.size === s ? ' on' : ''}" data-a="fs" data-p="size:${s}">${s}</button>`).join('')}</div>
  <label>Màu sắc</label><div class="row">${Object.entries(COLS)
-   .map(
-     ([n, c]) =>
-       `<button class="sw${f.color === n ? ' on' : ''}" style="background:${c}" data-a="fs" data-p="color:${n}" aria-label="${n}"></button>`
-   )
-   .join('')}</div>
+      .map(
+        ([n, c]) =>
+          `<button class="sw${f.color === n ? ' on' : ''}" style="background:${c}" data-a="fs" data-p="color:${n}" aria-label="${n}"></button>`
+      )
+      .join('')}</div>
  <label><input type="checkbox" data-f="stock" style="width:auto"${f.stock ? ' checked' : ''}> Chỉ còn hàng</label><button class="btn o s" style="margin-top:12px" data-a="reset">Xóa bộ lọc</button></aside>`;
   return `<div class="lay">${side}<section><div class="row" style="justify-content:space-between;margin-bottom:14px"><h1 style="margin:0;font-size:22px">${f.cat && f.cat !== 'sale' ? CATS.find(c => c[0] === f.cat)[1] : f.cat === 'sale' ? 'Khuyến mãi' : 'Tất cả sản phẩm'} <span class="mut" style="font-size:14px">(${l.length})</span></h1><div class="row"><button class="btn o s mo" data-a="side">Bộ lọc</button><select data-f="sort" style="width:auto" aria-label="Sắp xếp"><option value="new">Mới nhất</option><option value="pa"${f.sort === 'pa' ? ' selected' : ''}>Giá thấp → cao</option><option value="pd"${f.sort === 'pd' ? ' selected' : ''}>Giá cao → thấp</option><option value="best"${f.sort === 'best' ? ' selected' : ''}>Bán chạy</option><option value="rate"${f.sort === 'rate' ? ' selected' : ''}>Đánh giá cao</option></select></div></div>
- ${
-   l.length
-     ? `<div class="grid">${l
-         .slice((page - 1) * 12, page * 12)
-         .map(card)
-         .join('')}</div>`
-     : '<div class="empty"><h3>Không tìm thấy sản phẩm</h3><p>Thử đổi bộ lọc hoặc từ khóa khác.</p><button class="btn" data-a="reset">Xóa bộ lọc</button></div>'
- }
+ ${l.length
+      ? `<div class="grid">${l
+        .slice((page - 1) * 12, page * 12)
+        .map(card)
+        .join('')}</div>`
+      : '<div class="empty"><h3>Không tìm thấy sản phẩm</h3><p>Thử đổi bộ lọc hoặc từ khóa khác.</p><button class="btn" data-a="reset">Xóa bộ lọc</button></div>'
+    }
  ${pg > 1 ? `<div class="pag">${Array.from({ length: pg }, (_, i) => `<button class="chip${page === i + 1 ? ' on' : ''}" data-a="pg" data-p="${i + 1}">${i + 1}</button>`).join('')}</div>` : ''}</section></div>`;
 }
 
@@ -554,11 +553,11 @@ function detail() {
  <p class="pr"><b style="font-size:24px">${vnd(pp(p))}</b>${p.sale ? `<s>${vnd(p.price)}</s> <span class="badge">-${Math.round(100 - (p.sale / p.price) * 100)}%</span>` : ''}</p><p class="mut">${esc(p.desc)}</p>
  <b>Màu sắc</b><div class="row" style="margin:6px 0 14px">${p.colors.map(c => `<button class="sw${s.color === c ? ' on' : ''}" style="background:${COLS[c]}" data-a="sel" data-p="color:${c}" aria-label="${c}" title="${c}"></button>`).join('')}</div>
  <b>Size</b><div class="chips" style="margin:6px 0 14px">${p.sizes
-   .map(z => {
-     const out = s.color ? av(z, s.color) < 1 : p.colors.every(c => av(z, c) < 1);
-     return `<button class="chip${s.size === z ? ' on' : ''}${out ? ' x' : ''}" data-a="sel" data-p="size:${z}">${z}</button>`;
-   })
-   .join('')}</div>
+      .map(z => {
+        const out = s.color ? av(z, s.color) < 1 : p.colors.every(c => av(z, c) < 1);
+        return `<button class="chip${s.size === z ? ' on' : ''}${out ? ' x' : ''}" data-a="sel" data-p="size:${z}">${z}</button>`;
+      })
+      .join('')}</div>
  <div class="row" style="margin-bottom:6px"><b>Số lượng</b><button class="btn o s" data-a="qty" data-p="-1">−</button><b>${s.qty || 1}</b><button class="btn o s" data-a="qty" data-p="1">+</button><span class="mut">${s.size && s.color ? (max > 0 ? `Còn ${max} sản phẩm` : 'Hết hàng') : instock(p) ? 'Còn hàng' : 'Hết hàng'}</span></div>
  <div class="err" id="serr"></div><div class="row"><button class="btn" data-a="add" data-p="0" ${instock(p) ? '' : 'disabled'}>Thêm vào giỏ</button><button class="btn o" data-a="add" data-p="1" ${instock(p) ? '' : 'disabled'}>Mua ngay</button><button class="btn o" data-a="wish" data-p="${p.id}">${w ? '♥ Đã thích' : '♡ Yêu thích'}</button>${window.TryOn && TryOn.supports(p) !== false ? `<button class="btn o" data-a="tryon" data-p="${p.id}">Thử đồ với AI</button>` : ''}${window.Outfit ? `<button class="btn o" data-a="outfit" data-p="${p.id}">Phối đồ với sản phẩm này</button>` : ''}</div></div></div>
  <h2>Thông tin chi tiết</h2><div class="box"><p><b>Chất liệu:</b> ${esc(p.mat)}</p><p><b>Bảo quản:</b> Giặt máy ở 30°C, không dùng chất tẩy mạnh, phơi trong bóng râm, ủi nhiệt độ thấp.</p></div>
@@ -578,12 +577,12 @@ function reviewsHtml(p, rv) {
     : '';
   const list = n
     ? [...rv]
-        .sort((a, b) => (b.d || 0) - (a.d || 0))
-        .map(
-          r =>
-            `<div class="box rvitem"><div class="row" style="justify-content:space-between"><b>${esc(r.u || 'Khách hàng')}</b><span class="mut" style="font-size:12px">${r.d ? new Date(r.d).toLocaleDateString('vi-VN') : ''}</span></div><span class="st">${stars(r.r)}</span><p style="margin:4px 0 0">${esc(r.c)}</p></div>`
-        )
-        .join('')
+      .sort((a, b) => (b.d || 0) - (a.d || 0))
+      .map(
+        r =>
+          `<div class="box rvitem"><div class="row" style="justify-content:space-between"><b>${esc(r.u || 'Khách hàng')}</b><span class="mut" style="font-size:12px">${r.d ? new Date(r.d).toLocaleDateString('vi-VN') : ''}</span></div><span class="st">${stars(r.r)}</span><p style="margin:4px 0 0">${esc(r.c)}</p></div>`
+      )
+      .join('')
     : '<p class="mut">Chưa có đánh giá nào. Hãy là người đầu tiên sau khi mua hàng!</p>';
   return sum + `<div class="rvlist">${list}</div>` + reviewForm(p, rv);
 }
@@ -838,24 +837,24 @@ function dash() {
     .map(x => `<div class="box"><span class="mut">${x[0]}</span><b>${x[1]}</b></div>`)
     .join('')}</div>
  <div class="two" style="margin-top:20px"><div class="box"><h3>Doanh thu theo tháng</h3>${ks.length ? `<div class="bars">${ks.map(k => `<div><i style="height:${Math.round((m[k] / mx) * 110)}px"></i>${k.slice(5)}/${k.slice(2, 4)}</div>`).join('')}</div>` : '<p class="mut">Chưa có dữ liệu.</p>'}</div><div class="box"><h3>Sản phẩm bán chạy</h3>${[
-   ...db.products
- ]
-   .sort((a, b) => b.sold - a.sold)
-   .slice(0, 5)
-   .map(
-     p =>
-       `<p class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)}</span><b>${p.sold}</b></p>`
-   )
-   .join('')}</div></div>
+      ...db.products
+    ]
+      .sort((a, b) => b.sold - a.sold)
+      .slice(0, 5)
+      .map(
+        p =>
+          `<p class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)}</span><b>${p.sold}</b></p>`
+      )
+      .join('')}</div></div>
  <div class="box tw" style="margin-top:20px"><h3>Đơn hàng mới</h3><table><tr><th>Mã</th><th>Khách</th><th>Tổng</th><th>Trạng thái</th></tr>${[
-   ...db.orders
- ]
-   .sort((a, b) => b.date - a.date)
-   .slice(0, 5)
-   .map(
-     o => `<tr><td>${o.id}</td><td>${esc(o.name)}</td><td>${vnd(o.total)}</td><td>${stB(o.status)}</td></tr>`
-   )
-   .join('')}</table></div>`;
+      ...db.orders
+    ]
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 5)
+      .map(
+        o => `<tr><td>${o.id}</td><td>${esc(o.name)}</td><td>${vnd(o.total)}</td><td>${stB(o.status)}</td></tr>`
+      )
+      .join('')}</table></div>`;
 }
 
 function aprod() {
@@ -966,12 +965,12 @@ function stockGrid(p) {
   return `<div class="fld" id="m_stock"><label>Tồn kho theo size / màu <span class="mut">(đặt 0 = hết hàng; nhập số &gt; 0 để có hàng trở lại)</span></label>
 <div class="row" style="margin-bottom:8px"><input id="m_ka" type="number" min="0" placeholder="Số lượng" style="max-width:120px"><button type="button" class="btn s o" data-a="skall">Đặt cho tất cả</button><button type="button" class="btn s o" data-a="skzero" data-p="*">Hết hàng tất cả</button><span class="mut" id="m_kt">Tổng: ${total}</span></div>
 <div class="tw"><table><tr><th>Size</th><th>Màu</th><th>Số lượng</th><th>Trạng thái</th><th></th></tr>${keys
-    .map(k => {
-      const [sz, cl] = k.split('|'),
-        n = p.stock[k] || 0;
-      return `<tr><td>${esc(sz)}</td><td>${esc(cl)}</td><td><input type="number" min="0" step="1" data-sk="${esc(k)}" value="${n}" style="max-width:100px" aria-label="Tồn kho ${esc(sz)} ${esc(cl)}"></td><td data-sb="${esc(k)}">${skBadge(n)}</td><td><button type="button" class="btn s o" data-a="skzero" data-p="${esc(k)}">Hết hàng</button></td></tr>`;
-    })
-    .join('')}</table></div><p class="mut" style="margin:4px 0">Nếu đổi danh sách size/màu ở trên, biến thể mới sẽ dùng số lượng ở ô "Tồn kho biến thể mới" bên dưới.</p></div>`;
+      .map(k => {
+        const [sz, cl] = k.split('|'),
+          n = p.stock[k] || 0;
+        return `<tr><td>${esc(sz)}</td><td>${esc(cl)}</td><td><input type="number" min="0" step="1" data-sk="${esc(k)}" value="${n}" style="max-width:100px" aria-label="Tồn kho ${esc(sz)} ${esc(cl)}"></td><td data-sb="${esc(k)}">${skBadge(n)}</td><td><button type="button" class="btn s o" data-a="skzero" data-p="${esc(k)}">Hết hàng</button></td></tr>`;
+      })
+      .join('')}</table></div><p class="mut" style="margin:4px 0">Nếu đổi danh sách size/màu ở trên, biến thể mới sẽ dùng số lượng ở ô "Tồn kho biến thể mới" bên dưới.</p></div>`;
 }
 
 /* Đọc số lượng admin đã nhập trong bảng tồn kho: { 'S|Đen': 5, ... } */
@@ -1111,29 +1110,29 @@ function renderSug() {
     return i < 0
       ? esc(n)
       : esc(n.slice(0, i)) +
-          '<mark>' +
-          esc(n.slice(i, i + q.length)) +
-          '</mark>' +
-          esc(n.slice(i + q.length));
+      '<mark>' +
+      esc(n.slice(i, i + q.length)) +
+      '</mark>' +
+      esc(n.slice(i + q.length));
   };
   box.innerHTML =
     (cs.length
       ? '<div class="sg-h">Danh mục</div>' +
-        cs
-          .map(
-            c =>
-              `<div class="sg" role="option" data-a="sgcat" data-p="${c[0]}">Tất cả ${c[1]} <span class="mut">(${db.products.filter(p => p.cat === c[0]).length})</span></div>`
-          )
-          .join('')
+      cs
+        .map(
+          c =>
+            `<div class="sg" role="option" data-a="sgcat" data-p="${c[0]}">Tất cả ${c[1]} <span class="mut">(${db.products.filter(p => p.cat === c[0]).length})</span></div>`
+        )
+        .join('')
       : '') +
     (pr.length
       ? '<div class="sg-h">Sản phẩm</div>' +
-        pr
-          .map(
-            p =>
-              `<div class="sg" role="option" data-a="sgp" data-p="${p.id}"><img src="${img(p)}" alt=""><div><div>${hl(p.name)}</div><div class="mut" style="font-size:13px">${vnd(pp(p))}</div></div></div>`
-          )
-          .join('')
+      pr
+        .map(
+          p =>
+            `<div class="sg" role="option" data-a="sgp" data-p="${p.id}"><img src="${img(p)}" alt=""><div><div>${hl(p.name)}</div><div class="mut" style="font-size:13px">${vnd(pp(p))}</div></div></div>`
+        )
+        .join('')
       : '') +
     (pr.length || cs.length
       ? `<div class="sg all" role="option" data-a="sgall">Xem tất cả kết quả cho “${esc(q)}”</div>`
@@ -1998,7 +1997,7 @@ const bkToday = () => {
 };
 
 /* Cổng dữ liệu đặt lịch: demo lưu trong trình duyệt, api.js ghi đè để gọi server */
-let bkReload = () => {};
+let bkReload = () => { };
 let bkAll = async () => (db.bookings || []).map(b => ({ ...b, email: (db.users.find(u => u.id === b.userId) || {}).email || '' }));
 let bkCreate = async d => {
   const b = { id: (db.bkSeq = (db.bkSeq || 0) + 1), userId: db.session, status: 'PENDING', createdAt: Date.now(), note: null, ...d };

@@ -38,12 +38,12 @@
   let VM = {};
   try {
     TOKEN = localStorage.getItem('mono-token') || '';
-  } catch (e) {}
+  } catch (e) { }
   const setTok = t => {
     TOKEN = t;
     try {
       t ? localStorage.setItem('mono-token', t) : localStorage.removeItem('mono-token');
-    } catch (e) {}
+    } catch (e) { }
   };
   // Thông tin cho tryon.js: chỉ địa chỉ API của cửa hàng và token đăng nhập (không có khóa máy AI).
   window.MONO_TRYON = { api: API, token: () => TOKEN, online: false };
@@ -68,7 +68,7 @@
     let d = null;
     try {
       d = await r.json();
-    } catch (e) {}
+    } catch (e) { }
     if (!r.ok) {
       const x = d && d.details && d.details[0];
       const e = new Error(
@@ -194,7 +194,7 @@
       SERVER_COLS = false;
       try {
         db.collections = JSON.parse(localStorage.getItem('mono-collections')) || undefined;
-      } catch (x) {}
+      } catch (x) { }
     }
   }
   async function refreshCols() {
@@ -238,7 +238,7 @@
         p0.vid[v.size + '|' + v.color] = v.id;
       });
       if (S.view === 'detail') render();
-    } catch (e) {}
+    } catch (e) { }
   }
   /* Số lịch đặt đang chờ xác nhận (chấm số trên tab "Đặt lịch") */
   async function loadBkPending() {
@@ -248,7 +248,7 @@
     try {
       if (S.adm === 'dash') {
         S.stats = await rq('/admin/stats');
-        loadBkPending().catch(() => {});
+        loadBkPending().catch(() => { });
         db.orders = (await rq('/admin/orders')).map(mapO);
       } else if (S.adm === 'aprod') {
         db.products = (await rq('/admin/products')).map(mapP);
@@ -297,7 +297,7 @@
       if (v)
         try {
           await rq('/cart/items', { method: 'POST', body: { variantId: v, quantity: i.qty } });
-        } catch (e) {}
+        } catch (e) { }
     }
     await loadCart();
     const a = S.after;
@@ -315,7 +315,7 @@
       try {
         localStorage.setItem('mono-wish', JSON.stringify(db.wish));
         if (!SERVER_COLS) localStorage.setItem('mono-collections', JSON.stringify(db.collections || null));
-      } catch (e) {}
+      } catch (e) { }
     };
     rate = p => p.rating || 0;
     const go0 = go;
@@ -323,7 +323,7 @@
       if (ADMIN_P && v !== 'admin') {
         ADMIN_P = false;
         db.products = db.products.filter(p => p.active !== false);
-        loadProducts().then(() => render()).catch(() => {});
+        loadProducts().then(() => render()).catch(() => { });
       }
       go0(v, a);
       if (v === 'detail') {
@@ -333,7 +333,7 @@
             .then(() => {
               if (S.view === 'detail') render();
             })
-            .catch(() => {});
+            .catch(() => { });
       } else if (v === 'orders' && db.session)
         loadMyOrders()
           .then(() => {
@@ -896,7 +896,7 @@
     let wish = {};
     try {
       wish = JSON.parse(localStorage.getItem('mono-wish')) || {};
-    } catch (e) {}
+    } catch (e) { }
     db = { v: 1, session: null, users: [], products: [], orders: [], carts: {}, wish, reviews: {}, coupons: [], chats: {} };
     install();
     window.MONO_TRYON.online = true;

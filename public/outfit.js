@@ -43,7 +43,7 @@
     if (tok) h.Authorization = 'Bearer ' + tok;
     const r = await fetch(e.api + '/outfit/recommend', { method: 'POST', headers: h, body: JSON.stringify(body) });
     let d = {};
-    try { d = await r.json(); } catch (x) {}
+    try { d = await r.json(); } catch (x) { }
     if (!r.ok) {
       const err = new Error(d.error || 'Không thể phối đồ lúc này');
       err.status = r.status;
@@ -111,8 +111,8 @@
       if (mine !== O.seq) return;
       O.error = e.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
         : e.status === 429 ? 'Bạn thao tác quá nhanh. Vui lòng chờ một chút rồi thử lại.'
-        : e.status === 404 || e.status === 422 ? e.message
-        : 'Không thể phối đồ lúc này. Vui lòng thử lại sau.';
+          : e.status === 404 || e.status === 422 ? e.message
+            : 'Không thể phối đồ lúc này. Vui lòng thử lại sau.';
     }
     O.loading = false;
     paint();
