@@ -510,7 +510,7 @@ function filt() {
   return l.sort(o[f.sort]);
 }
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 9;
 
 function pagerItems(cur, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
