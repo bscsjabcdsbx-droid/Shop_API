@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "import:demo": "tsx tools/import-demo-products.ts"
+  }
+}

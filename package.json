@@ -8,6 +8,7 @@
     "db:push": "prisma db push",
     "seed": "tsx prisma/seed.ts",
     "start": "tsx src/index.ts",
+    "import:demo": "tsx tools/import-demo-products.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

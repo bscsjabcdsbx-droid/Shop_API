@@ -903,7 +903,7 @@ textarea {
    ========================================================================== */
 .lay {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 28px;
   margin-top: 20px;
 }
@@ -917,9 +917,29 @@ textarea {
 
 .pag {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
+  align-items: center;
   margin: 28px 0;
+}
+
+.pag .chip {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 6px 12px;
+}
+
+.pag .chip:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.pag-gap {
+  min-width: 24px;
+  text-align: center;
+  color: var(--mut, #888);
+  user-select: none;
 }
 
 
@@ -1782,7 +1802,7 @@ footer {
   }
 
   .lay {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .grid {

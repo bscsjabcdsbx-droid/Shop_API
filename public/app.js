@@ -510,10 +510,35 @@ function filt() {
   return l.sort(o[f.sort]);
 }
 
+const PAGE_SIZE = 12;
+
+function pagerItems(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, cur - 1, cur, cur + 1]);
+  if (cur <= 3) [2, 3, 4].forEach(n => set.add(n));
+  if (cur >= total - 2) [total - 3, total - 2, total - 1].forEach(n => set.add(n));
+  const nums = [...set].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  nums.forEach((n, i) => {
+    if (i && n - nums[i - 1] > 1) out.push('…');
+    out.push(n);
+  });
+  return out;
+}
+
+function pager(cur, total) {
+  if (total <= 1) return '';
+  const btn = (label, p, extra = '', dis = false) =>
+    `<button class="chip${extra}" data-a="pg" data-p="${p}"${dis ? ' disabled' : ''} aria-label="Trang ${p}">${label}</button>`;
+  return `<nav class="pag" aria-label="Phân trang">${btn('‹', cur - 1, ' pn', cur === 1)}${pagerItems(cur, total)
+    .map(n => (n === '…' ? '<span class="pag-gap">…</span>' : btn(n, n, cur === n ? ' on' : '')))
+    .join('')}${btn('›', cur + 1, ' pn', cur === total)}</nav>`;
+}
+
 function products() {
   const f = S.f,
     l = filt(),
-    pg = Math.max(1, Math.ceil(l.length / 12)),
+    pg = Math.max(1, Math.ceil(l.length / PAGE_SIZE)),
     page = Math.min(f.page, pg),
     sizes = ['S', 'M', 'L', 'XL', 'FREE'];
   const side = `<aside class="side" id="side"><div class="mo row" style="justify-content:space-between"><b>Bộ lọc</b><button class="btn s" data-a="side">Đóng</button></div>
@@ -530,12 +555,12 @@ function products() {
   return `<div class="lay">${side}<section><div class="row" style="justify-content:space-between;margin-bottom:14px"><h1 style="margin:0;font-size:22px">${f.cat && f.cat !== 'sale' ? CATS.find(c => c[0] === f.cat)[1] : f.cat === 'sale' ? 'Khuyến mãi' : 'Tất cả sản phẩm'} <span class="mut" style="font-size:14px">(${l.length})</span></h1><div class="row"><button class="btn o s mo" data-a="side">Bộ lọc</button><select data-f="sort" style="width:auto" aria-label="Sắp xếp"><option value="new">Mới nhất</option><option value="pa"${f.sort === 'pa' ? ' selected' : ''}>Giá thấp → cao</option><option value="pd"${f.sort === 'pd' ? ' selected' : ''}>Giá cao → thấp</option><option value="best"${f.sort === 'best' ? ' selected' : ''}>Bán chạy</option><option value="rate"${f.sort === 'rate' ? ' selected' : ''}>Đánh giá cao</option></select></div></div>
  ${l.length
       ? `<div class="grid">${l
-        .slice((page - 1) * 12, page * 12)
+        .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
         .map(card)
         .join('')}</div>`
       : '<div class="empty"><h3>Không tìm thấy sản phẩm</h3><p>Thử đổi bộ lọc hoặc từ khóa khác.</p><button class="btn" data-a="reset">Xóa bộ lọc</button></div>'
     }
- ${pg > 1 ? `<div class="pag">${Array.from({ length: pg }, (_, i) => `<button class="chip${page === i + 1 ? ' on' : ''}" data-a="pg" data-p="${i + 1}">${i + 1}</button>`).join('')}</div>` : ''}</section></div>`;
+ ${pager(page, pg)}</section></div>`;
 }
 
 function detail() {
