@@ -92,7 +92,7 @@
       vid[v.size + '|' + v.color] = v.id;
     });
     const sizes = [...new Set(vs.map(v => v.size))].sort((a, b) => SZ.indexOf(a) - SZ.indexOf(b));
-    const colors = Object.keys(COLS).filter(c => vs.some(v => v.color === c));
+    const colors = [...new Set(vs.map(v => v.color))];
     return {
       id: s.id,
       slug: s.slug,
@@ -622,10 +622,12 @@
         .split(',')
         .map(s => s.trim().toUpperCase())
         .filter(Boolean);
-      const colors = g('m_l')
-        .split(',')
-        .map(s => s.trim())
-        .filter(c => COLS[c]);
+      const colors = [...new Set(
+        g('m_l')
+          .split(',')
+          .map(c => c.trim())
+          .filter(Boolean)
+      )];
       if (g('m_n').length < 2) return (er.textContent = 'Vui lòng nhập tên sản phẩm');
       if (!(price > 0)) return (er.textContent = 'Giá phải lớn hơn 0');
       if (sale && sale >= price) return (er.textContent = 'Giá khuyến mãi phải thấp hơn giá gốc');
