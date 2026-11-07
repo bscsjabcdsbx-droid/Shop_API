@@ -63,8 +63,9 @@ export async function loadGarmentImage(url: string): Promise<{ data: Buffer; mim
   } else if (/^https?:\/\//i.test(ref)) {
     let u: URL;
     try { u = new URL(ref); } catch { throw new GarmentError("GARMENT_INVALID", "Đường dẫn ảnh sản phẩm không hợp lệ"); }
-    if (!cfg.garmentAllowedHosts.includes(u.hostname.toLowerCase()))
-      throw new GarmentError("GARMENT_HOST_NOT_ALLOWED", "Ảnh sản phẩm nằm ở máy chủ ngoài chưa được cho phép");
+    if (u.protocol !== "https:") {
+      throw new GarmentError("GARMENT_INVALID", "Chỉ chấp nhận ảnh HTTPS");
+    }
     let res: Response;
     try {
       res = await fetch(u, { redirect: "error", signal: AbortSignal.timeout(15000) });
