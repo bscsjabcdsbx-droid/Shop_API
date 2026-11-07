@@ -926,6 +926,8 @@ async function resetSwatch(name) {
   } catch (e) { }
 }
 
+const A = {};
+
 Object.assign(A, {
   csadd: async () => {
     const n = ($('#cs_n').value || '').trim(),
@@ -1397,8 +1399,6 @@ function render() {
 /* ==========================================================================
   14. XỬ LÝ SỰ KIỆN (nút bấm, form, bàn phím)
    ========================================================================== */
-
-const A = {};
 
 // --- Điều hướng & bộ lọc ---
 Object.assign(A, {
