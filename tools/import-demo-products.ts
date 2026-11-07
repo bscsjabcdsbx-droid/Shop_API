@@ -1,51 +1,44 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { load } from "cheerio";
+import { createHash } from "node:crypto";
 
 const db = new PrismaClient();
 
-const API_URL =
-  "https://raw.githubusercontent.com/arturayupov/womens-fashion-catalog-open-data/main/data/products.json";
+const BASE_URL = "https://dosi-in.com";
 
-const USD_TO_VND = Number(process.env.DEMO_USD_TO_VND ?? 25_000);
-const DEFAULT_LIMIT = 1500;
-const MAX_LIMIT = 999999;
+const CATEGORY_SOURCES = [
+  {
+    slug: "ao",
+    name: "Áo",
+    url: `${BASE_URL}/danh-muc/ao-thun/`,
+    tryOnType: "upper",
+  },
+  {
+    slug: "quan",
+    name: "Quần",
+    url: `${BASE_URL}/danh-muc/quan/`,
+    tryOnType: "lower",
+  },
+  {
+    slug: "vay",
+    name: "Váy",
+    url: `${BASE_URL}/danh-muc/vay-dam/`,
+    tryOnType: "overall",
+  },
+  {
+    slug: "khoac",
+    name: "Áo khoác",
+    url: `${BASE_URL}/danh-muc/ao-khoac/`,
+    tryOnType: "upper",
+  },
+] as const;
 
-type SourceVariant = {
-  sku?: string;
-  title?: string;
-  price_usd?: number;
-  compare_at_price_usd?: number;
-  in_stock?: boolean;
-  options?: Record<string, string>;
-};
-
-type SourceProduct = {
-  id: string | number;
-  handle?: string;
-  title: string;
-  url?: string;
-  product_type?: string;
-  vendor?: string;
-  tags?: string[];
-  description?: string;
-  category?: {
-    id?: string;
-    name?: string;
-    full_path?: string;
-  };
-  price?: {
-    min_usd?: number;
-    max_usd?: number;
-    currency?: string;
-  };
-  images?: Array<{
-    url?: string;
-    alt?: string;
-  }>;
-  featured_image_url?: string;
-  variants?: SourceVariant[];
-};
+const DEFAULT_LIMIT = 300;
+const MAX_LIMIT = 2000;
+const REQUEST_DELAY_MS = 700;
+const OLD_IMPORT_PREFIX = "demo-livostyle-";
 
 type CategoryInfo = {
   slug: string;
@@ -53,14 +46,110 @@ type CategoryInfo = {
   tryOnType: string;
 };
 
-const slugify = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+type ProductData = {
+  "@type"?: string | string[];
+  name?: string;
+  description?: string;
+  image?: string | string[];
+  sku?: string | number;
+  category?: string;
+  brand?: {
+    name?: string;
+  } | string;
+  offers?: {
+    price?: string | number;
+    priceCurrency?: string;
+    availability?: string;
+  };
+};
+
+type CrawledProduct = {
+  name: string;
+  colors: string[];
+  description: string;
+  sourceUrl: string;
+  sourceId: string;
+  brand: string;
+  price: number;
+  imageUrls: string[];
+  category: CategoryInfo;
+  soldCount: number;
+  sizes: string[];
+};
+
+/* =========================
+   XỬ LÝ SIZE VÀ MÀU SẮC
+========================= */
+
+function getSizes(description: string): string[] {
+  const sizePattern =
+    /(?:size|kích cỡ|kích thước)\s*[:：]\s*((?:(?:XXXS|XXS|XXXL|XXL|XS|XL|S|M|L|[2-5]XL|FREE\s*SIZE|FREESIZE|ONE\s*SIZE|FREE|[0-9]{2})(?:\s*[,/|;]\s*)?)+)/i;
+
+  const match = description.match(sizePattern);
+
+  if (!match) return [];
+
+  const tokens = match[1].match(
+    /XXXS|XXS|XXXL|XXL|XS|XL|S|M|L|[2-5]XL|FREE\s*SIZE|FREESIZE|ONE\s*SIZE|FREE|[0-9]{2}/gi,
+  );
+
+  return [
+    ...new Set(
+      (tokens ?? []).map((size) =>
+        size.toUpperCase().replace(/\s+/g, " ").trim(),
+      ),
+    ),
+  ];
+}
+
+function getColors(description: string): string[] {
+  const lines = description
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const colors: string[] = [];
+
+  for (const line of lines) {
+    const match = line.match(
+      /(?:màu sắc|màu|color|colours?)\s*[:：]\s*(.+)/i,
+    );
+
+    if (!match) continue;
+
+    const values = match[1]
+      .split(/[,;/|]+/)
+      .map((color) => color.trim())
+      .filter(Boolean)
+      .map((color) => color.slice(0, 40));
+
+    colors.push(...values);
+  }
+
+  return [...new Set(colors)];
+}
+
+function getVariants(product: CrawledProduct) {
+  const sizes = product.sizes.length > 0
+    ? product.sizes
+    : ["Chưa rõ"];
+
+  const colors = product.colors.length > 0
+    ? product.colors
+    : ["Chưa rõ"];
+
+  return sizes.flatMap((size) =>
+    colors.map((color) => ({
+      size,
+      color,
+      stock: 0,
+    })),
+  );
+}
+
+/* =========================
+   TIỆN ÍCH
+========================= */
 
 function getArg(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -72,86 +161,83 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
-function usage() {
-  console.log(`
-Shop_API - Livostyle Fashion Importer
-
-Usage:
-  npm run import:demo -- --limit=300
-  npm run import:demo -- --limit=100 --category=ao
-  npm run import:demo -- --limit=100 --category=quan
-  npm run import:demo -- --limit=100 --category=vay
-  npm run import:demo -- --limit=300 --dry-run
-
-Options:
-  --limit=N       Maximum products (1-${MAX_LIMIT})
-  --category=SLUG ao, quan, vay
-  --dry-run       Preview without writing to database
-  --help          Show help
-
-Environment:
-  DATABASE_URL
-  DEMO_USD_TO_VND (default 25000)
-`);
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
-async function fetchProducts(): Promise<SourceProduct[]> {
-  console.log("Đang tải dữ liệu Livostyle Fashion Catalog...");
-
-  const response = await fetch(API_URL, {
-    headers: {
-      accept: "application/json",
-      "user-agent": "Shop-API-Fashion-Importer/1.0",
-    },
-    signal: AbortSignal.timeout(120_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Không thể tải dữ liệu: HTTP ${response.status}`);
+function makeSourceId(url: string, sku?: string | number): string {
+  if (sku !== undefined && String(sku).trim()) {
+    return String(sku).trim();
   }
 
-  const data: unknown = await response.json();
+  const match = url.match(/\.([0-9]+)\/?$/);
 
-  if (Array.isArray(data)) {
-    return data as SourceProduct[];
+  if (match) {
+    return match[1];
   }
 
-  if (
-    data &&
-    typeof data === "object" &&
-    "products" in data &&
-    Array.isArray(data.products)
-  ) {
-    return data.products as SourceProduct[];
-  }
-
-  throw new Error("Cấu trúc dữ liệu JSON không hợp lệ.");
+  return createHash("sha256")
+    .update(url)
+    .digest("hex")
+    .slice(0, 16);
 }
 
-// Chỉ lấy quần áo, bỏ giày dép và phụ kiện.
-function getCategory(product: SourceProduct): CategoryInfo | null {
-  const name = String(product.category?.name ?? "")
-    .toLowerCase()
+function makeProductSlug(product: CrawledProduct): string {
+  return `dosi-${slugify(product.sourceId)}-${slugify(product.name)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function cleanText(value?: string): string {
+  if (!value) return "";
+
+  const $ = load(`<div>${value}</div>`);
+
+  return $.text()
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
 
-  const path = String(product.category?.full_path ?? "")
-    .toLowerCase();
+/* =========================
+   PHÂN LOẠI SẢN PHẨM
+========================= */
 
-  const type = String(product.product_type ?? "")
-    .toLowerCase()
-    .trim();
+function getCategoryInfo(
+  sourceCategory: string,
+  productName: string,
+  fallback: CategoryInfo,
+): CategoryInfo {
+  const text = `${sourceCategory} ${productName}`.toLowerCase();
 
-  const text = `${name} ${path} ${type}`;
-
-  // Không lấy giày dép và phụ kiện.
-  if (
-    /shoes|sandals|boots|sneakers|footwear|bags|jewelry|sunglasses|watches/.test(text)
-  ) {
-    return null;
+  if (/áo dài/.test(text)) {
+    return {
+      slug: "ao",
+      name: "Áo",
+      tryOnType: "overall",
+    };
   }
 
-  // Váy liền: thử đồ toàn thân.
-  if (/dress|dresses/.test(text)) {
+  if (/chân váy|váy ngắn|váy dài|skirt|skorts/.test(text)) {
+    return {
+      slug: "vay",
+      name: "Váy",
+      tryOnType: "lower",
+    };
+  }
+
+  if (/đầm|váy liền|jumpsuit|romper/.test(text)) {
     return {
       slug: "vay",
       name: "Váy",
@@ -159,17 +245,7 @@ function getCategory(product: SourceProduct): CategoryInfo | null {
     };
   }
 
-  // Chân váy: thử đồ phần dưới.
-  if (/skirt|skirts|skorts/.test(text)) {
-    return {
-      slug: "vay",
-      name: "Váy",
-      tryOnType: "lower",
-    };
-  }
-
-  // Quần.
-  if (/trousers|pants|shorts|jeans|leggings|joggers/.test(text)) {
+  if (/quần|jeans|shorts|pants|legging/.test(text)) {
     return {
       slug: "quan",
       name: "Quần",
@@ -177,10 +253,15 @@ function getCategory(product: SourceProduct): CategoryInfo | null {
     };
   }
 
-  // Áo.
-  if (
-    /blouses|clothing tops|t-shirts|shirts|tank tops|sweaters|hoodies|sweatshirts|cardigans|bodysuits|tunics|vests|coats|jackets|overcoats|windbreakers|kimonos|cover ups|cover-up|swimwear|bikinis/.test(text)
-  ) {
+  if (/áo khoác|jacket|coat|hoodie|cardigan/.test(text)) {
+    return {
+      slug: "khoac",
+      name: "Áo khoác",
+      tryOnType: "upper",
+    };
+  }
+
+  if (/áo|shirt|tee|blouse|top/.test(text)) {
     return {
       slug: "ao",
       name: "Áo",
@@ -188,141 +269,458 @@ function getCategory(product: SourceProduct): CategoryInfo | null {
     };
   }
 
-  return null;
+  return { ...fallback };
 }
 
-function getImageUrls(product: SourceProduct): string[] {
-  const candidates = [
-    ...(product.images ?? []).map((image) => image.url ?? ""),
-    product.featured_image_url ?? "",
-  ];
+/* =========================
+   ĐỌC JSON-LD
+========================= */
+
+function extractProductJsonLd(html: string): ProductData | null {
+  const $ = load(html);
+
+  let result: ProductData | null = null;
+
+  $('script[type="application/ld+json"]').each((_, element) => {
+    if (result) return;
+
+    const raw = $(element).html();
+    if (!raw) return;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+
+      const visit = (value: unknown): void => {
+        if (result || !value || typeof value !== "object") return;
+
+        const obj = value as Record<string, unknown>;
+
+        const type = obj["@type"];
+
+        const isProduct =
+          type === "Product" ||
+          (Array.isArray(type) && type.includes("Product"));
+
+        if (isProduct) {
+          result = obj as ProductData;
+          return;
+        }
+
+        if (Array.isArray(value)) {
+          for (const item of value) visit(item);
+          return;
+        }
+
+        if (Array.isArray(obj["@graph"])) {
+          visit(obj["@graph"]);
+        }
+      };
+
+      visit(parsed);
+    } catch {
+      // Bỏ qua JSON-LD không hợp lệ.
+    }
+  });
+
+  return result;
+}
+
+/* =========================
+   XỬ LÝ ẢNH
+========================= */
+
+function getImageUrls(product: ProductData): string[] {
+  const candidates = Array.isArray(product.image)
+    ? product.image
+    : product.image
+      ? [product.image]
+      : [];
 
   const valid = candidates.filter((value) => {
     try {
       const url = new URL(value);
+
       return (
         url.protocol === "https:" &&
-        url.hostname === "cdn.shopify.com"
+        (
+          url.hostname === "img.dosi-in.com" ||
+          url.hostname === "dosi-in.com"
+        )
       );
     } catch {
       return false;
     }
   });
 
-  return [...new Set(valid)].slice(0, 5);
+  return [...new Set(valid)].slice(0, 8);
 }
 
-function toVnd(usd: number): number {
-  return Math.max(
-    1_000,
-    Math.round((usd * USD_TO_VND) / 1_000) * 1_000,
-  );
-}
+/* =========================
+   THÔNG TIN BÁN HÀNG
+========================= */
 
-function getPrice(product: SourceProduct): number {
-  return Number(
-    product.price?.min_usd ??
-      product.variants?.[0]?.price_usd ??
-      0,
-  );
-}
+function getSoldCount(html: string): number {
+  const $ = load(html);
+  const text = $("body").text();
 
-function getSalePrice(product: SourceProduct): number | null {
-  const variants = product.variants ?? [];
-
-  const variant = variants.find(
-    (item) =>
-      item.in_stock &&
-      Number(item.compare_at_price_usd ?? 0) >
-        Number(item.price_usd ?? 0),
+  const match = text.match(
+    /([\d.,]+)\s*(?:đã bán|sản phẩm đã bán)/i,
   );
 
-  if (!variant) return null;
+  if (!match) return 0;
 
-  return toVnd(Number(variant.price_usd));
+  const value = Number(match[1].replace(/[.,]/g, ""));
+
+  return Number.isFinite(value) ? value : 0;
 }
 
-// Chuyển biến thể từ nguồn sang schema Shop_API.
-function getVariants(product: SourceProduct) {
-  const sourceVariants = product.variants ?? [];
+/* =========================
+   LẤY LINK SẢN PHẨM
+========================= */
 
-  const variants = sourceVariants.map((variant) => {
-    const options = variant.options ?? {};
+function getProductLinks(
+  html: string,
+  category: CategoryInfo,
+): Array<{ url: string; category: CategoryInfo }> {
+  const $ = load(html);
 
-    const size =
-      options.Size ??
-      options.size ??
-      "FREE";
+  const results = new Map<
+    string,
+    { url: string; category: CategoryInfo }
+  >();
 
-    const color =
-      options.Color ??
-      options.color ??
-      "Mặc định";
+  $('a[href*="/san-pham/"]').each((_, element) => {
+    const href = $(element).attr("href");
+    if (!href) return;
 
-    return {
-      size,
-      color,
-      // Nguồn chỉ cung cấp trạng thái còn hàng,
-      // không cung cấp số lượng tồn kho thực tế.
-      stock: variant.in_stock ? 1 : 0,
-    };
+    try {
+      const url = new URL(href, BASE_URL);
+
+      if (
+        url.hostname !== "dosi-in.com" ||
+        !url.pathname.startsWith("/san-pham/")
+      ) {
+        return;
+      }
+
+      url.search = "";
+      url.hash = "";
+
+      const canonicalUrl = url.href;
+
+      results.set(canonicalUrl, {
+        url: canonicalUrl,
+        category,
+      });
+    } catch {
+      // Bỏ qua link không hợp lệ.
+    }
   });
 
-  const unique = [
-    ...new Map(
-      variants.map((variant) => [
-        `${variant.size}-${variant.color}`,
-        variant,
-      ]),
-    ).values(),
-  ];
+  return [...results.values()];
+}
 
-  if (unique.length > 0) {
-    return unique;
+/* =========================
+   TẢI TRANG WEB
+========================= */
+
+async function fetchHtml(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      accept: "text/html,application/xhtml+xml",
+      "user-agent": "Mozilla/5.0 (compatible; ShopAPIImporter/1.0)",
+    },
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${url}`);
   }
 
-  return [
-    {
-      size: "FREE",
-      color: "Mặc định",
-      stock: 0,
+  return response.text();
+}
+
+/* =========================
+   CÀO CHI TIẾT SẢN PHẨM
+========================= */
+
+async function crawlProduct(
+  url: string,
+  fallbackCategory: CategoryInfo,
+): Promise<CrawledProduct | null> {
+  const html = await fetchHtml(url);
+  const source = extractProductJsonLd(html);
+
+  if (!source || !source.name) {
+    console.log("  Bỏ qua: không tìm thấy dữ liệu Product JSON-LD");
+    return null;
+  }
+
+  const price = Number(source.offers?.price ?? 0);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    console.log("  Bỏ qua: sản phẩm không có giá hợp lệ");
+    return null;
+  }
+
+  const imageUrls = getImageUrls(source);
+
+  if (imageUrls.length === 0) {
+    console.log("  Bỏ qua: sản phẩm không có ảnh hợp lệ");
+    return null;
+  }
+
+  const description = cleanText(source.description);
+
+  const brand =
+    typeof source.brand === "string"
+      ? source.brand
+      : source.brand?.name ?? "";
+
+  const category = getCategoryInfo(
+    String(source.category ?? ""),
+    source.name,
+    fallbackCategory,
+  );
+
+  const sizes = getSizes(description);
+  const colors = getColors(description);
+
+  return {
+    name: source.name.trim(),
+    colors,
+    description,
+    sourceUrl: url,
+    sourceId: makeSourceId(url, source.sku),
+    brand,
+    price: Math.round(price),
+    imageUrls,
+    category,
+    soldCount: getSoldCount(html),
+    sizes,
+  };
+}
+
+/* =========================
+   CÀO DANH MỤC
+========================= */
+
+async function crawlCategories(
+  limit: number,
+  requestedCategory?: string,
+): Promise<CrawledProduct[]> {
+  const selectedCategories = CATEGORY_SOURCES.filter(
+    (category) =>
+      !requestedCategory || category.slug === requestedCategory,
+  );
+
+  const links: Array<{
+    url: string;
+    category: CategoryInfo;
+  }> = [];
+
+  console.log("\n========== LẤY DANH SÁCH SẢN PHẨM ==========");
+
+  for (const source of selectedCategories) {
+    console.log(`\nDanh mục: ${source.name}`);
+
+    try {
+      const html = await fetchHtml(source.url);
+      const found = getProductLinks(html, source);
+
+      console.log(`Tìm thấy ${found.length} đường dẫn sản phẩm.`);
+
+      links.push(...found);
+    } catch (error) {
+      console.error(`Không tải được danh mục ${source.name}:`, error);
+    }
+
+    await sleep(REQUEST_DELAY_MS);
+  }
+
+  const linksByCategory = new Map<
+    string,
+    Array<{ url: string; category: CategoryInfo }>
+  >();
+
+  for (const item of links) {
+    const slug = item.category.slug;
+
+    if (!linksByCategory.has(slug)) {
+      linksByCategory.set(slug, []);
+    }
+
+    const group = linksByCategory.get(slug)!;
+
+    if (!group.some((existing) => existing.url === item.url)) {
+      group.push(item);
+    }
+  }
+
+  const uniqueLinks: Array<{
+    url: string;
+    category: CategoryInfo;
+  }> = [];
+
+  const seenUrls = new Set<string>();
+
+  let index = 0;
+
+  while (uniqueLinks.length < limit) {
+    let added = false;
+
+    for (const category of selectedCategories) {
+      const item = linksByCategory.get(category.slug)?.[index];
+
+      if (!item || seenUrls.has(item.url)) {
+        continue;
+      }
+
+      uniqueLinks.push(item);
+      seenUrls.add(item.url);
+      added = true;
+
+      if (uniqueLinks.length >= limit) {
+        break;
+      }
+    }
+
+    if (!added) {
+      break;
+    }
+
+    index++;
+  }
+
+  console.log(`\nTổng link duy nhất cần xử lý: ${uniqueLinks.length}`);
+
+  const products: CrawledProduct[] = [];
+
+  console.log("\n========== CÀO CHI TIẾT SẢN PHẨM ==========");
+
+  for (let i = 0; i < uniqueLinks.length; i++) {
+    const item = uniqueLinks[i];
+
+    console.log(`\n[${i + 1}/${uniqueLinks.length}] ${item.url}`);
+
+    try {
+      const product = await crawlProduct(
+        item.url,
+        item.category,
+      );
+
+      if (product) {
+        products.push(product);
+
+        console.log(
+          `  OK: ${product.name} | ` +
+          `${product.price.toLocaleString("vi-VN")}₫ | ` +
+          `${product.imageUrls.length} ảnh`,
+        );
+
+        console.log(
+          `  Size: ${product.sizes.join(", ") || "Chưa rõ"}`,
+        );
+
+        console.log(
+          `  Màu: ${product.colors.join(", ") || "Chưa rõ"}`,
+        );
+      }
+    } catch (error) {
+      console.error("  Lỗi:", error);
+    }
+
+    if (i < uniqueLinks.length - 1) {
+      await sleep(REQUEST_DELAY_MS);
+    }
+  }
+
+  return products;
+}
+
+/* =========================
+   XÓA SẢN PHẨM IMPORT CŨ
+========================= */
+
+async function countOldProducts(): Promise<number> {
+  return db.product.count({
+    where: {
+      slug: {
+        startsWith: OLD_IMPORT_PREFIX,
+      },
     },
-  ];
+  });
 }
 
+async function removeOldProducts(): Promise<number> {
+  const oldProducts = await db.product.findMany({
+    where: {
+      slug: {
+        startsWith: OLD_IMPORT_PREFIX,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  });
 
-function cleanDescription(value?: string): string {
-  return (value ?? "")
-    // Giữ khoảng cách giữa các đoạn HTML.
-    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<li[^>]*>/gi, "\n• ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/[ \t]+/g, " ")
-    .replace(/ *\n */g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  console.log("\n========== SẢN PHẨM IMPORT CŨ ==========");
+  console.log(`Tìm thấy ${oldProducts.length} sản phẩm Livostyle cũ.`);
+
+  for (const product of oldProducts.slice(0, 20)) {
+    console.log(`- ${product.name} (${product.slug})`);
+  }
+
+  if (oldProducts.length === 0) return 0;
+
+  const result = await db.product.deleteMany({
+    where: {
+      slug: {
+        startsWith: OLD_IMPORT_PREFIX,
+      },
+    },
+  });
+
+  return result.count;
 }
 
+/* =========================
+   CHƯƠNG TRÌNH CHÍNH
+========================= */
 
 async function main() {
   if (hasFlag("help")) {
-    usage();
+    console.log(`
+Shop_API - Dosi-in Fashion Importer
+
+Usage:
+  npm run import:demo -- --limit=100 --dry-run
+  npm run import:demo -- --limit=300 --dry-run
+  npm run import:demo -- --limit=100 --category=ao --dry-run
+  npm run import:demo -- --limit=100 --category=quan --dry-run
+  npm run import:demo -- --limit=100 --category=vay --dry-run
+  npm run import:demo -- --limit=100 --category=khoac --dry-run
+
+Import thật:
+  npm run import:demo -- --limit=300
+
+Xóa sản phẩm từ importer tiếng Anh cũ và import Dosi-in:
+  npm run import:demo -- --limit=300 --clean-old
+
+Options:
+  --limit=N       Số sản phẩm tối đa (1-${MAX_LIMIT})
+  --category=...  ao, quan, vay, khoac
+  --dry-run       Chỉ xem trước, không ghi database
+  --clean-old     Xóa sản phẩm có slug demo-livostyle- trước khi import
+  --help          Hiển thị hướng dẫn
+`);
     return;
   }
 
   if (!process.env.DATABASE_URL) {
     throw new Error("Thiếu DATABASE_URL trong file .env.");
-  }
-
-  if (!Number.isFinite(USD_TO_VND) || USD_TO_VND <= 0) {
-    throw new Error("DEMO_USD_TO_VND phải lớn hơn 0.");
   }
 
   const limit = Number(getArg("limit") ?? DEFAULT_LIMIT);
@@ -335,162 +733,138 @@ async function main() {
 
   if (
     requestedCategory &&
-    !["ao", "quan", "vay"].includes(requestedCategory)
+    !CATEGORY_SOURCES.some(
+      (category) => category.slug === requestedCategory,
+    )
   ) {
-    throw new Error("--category chỉ nhận ao, quan, vay.");
+    throw new Error("--category chỉ nhận ao, quan, vay, khoac.");
   }
 
-  // 1. Tải catalog.
-  const products = await fetchProducts();
+  console.log("========================================");
+  console.log("       DOSI-IN FASHION IMPORTER");
+  console.log("========================================");
+  console.log(`Giới hạn: ${limit}`);
+  console.log(`Danh mục: ${requestedCategory ?? "Tất cả"}`);
+  console.log(`Chế độ xem trước: ${hasFlag("dry-run") ? "Có" : "Không"}`);
+  console.log(`Xóa dữ liệu importer cũ: ${hasFlag("clean-old") ? "Có" : "Không"}`);
 
-  console.log("\n========== KIỂM TRA DỮ LIỆU ==========");
+  const oldCount = await countOldProducts();
 
-  console.log(
-    JSON.stringify(products.slice(0, 3), null, 2)
+  console.log(`\nSản phẩm từ importer tiếng Anh cũ: ${oldCount}`);
+
+  const products = await crawlCategories(
+    limit,
+    requestedCategory,
   );
 
-  console.log("\n========== DANH MỤC ==========");
+  console.log("\n========== TỔNG HỢP DỮ LIỆU ==========");
+  console.log(`Cào thành công: ${products.length}`);
 
-  const categories = [
-    ...new Set(
-      products.map((p) =>
-        JSON.stringify(p.category)
-      )
-    ),
-  ];
+  const categoryCounts = new Map<string, number>();
 
-  console.log(categories.slice(0, 30));
-
-  console.log(`Nguồn cung cấp: ${products.length} sản phẩm.`);
-
-  // 2. Lọc riêng quần áo.
-  const filtered = products
-    .map((product) => ({
-      product,
-      category: getCategory(product),
-    }))
-    .filter(
-      (
-        item,
-      ): item is {
-        product: SourceProduct;
-        category: CategoryInfo;
-      } => {
-        return (
-          item.category !== null &&
-          (!requestedCategory ||
-            item.category.slug === requestedCategory)
-        );
-      },
+  for (const product of products) {
+    categoryCounts.set(
+      product.category.name,
+      (categoryCounts.get(product.category.name) ?? 0) + 1,
     );
+  }
 
-  const unique = [
-    ...new Map(
-      filtered.map((item) => [
-        item.product.id,
-        item,
-      ]),
-    ).values(),
-  ].slice(0, limit);
-
-  console.log(`Sản phẩm quần áo phù hợp: ${filtered.length}`);
-  console.log(`Số sản phẩm sẽ xử lý: ${unique.length}`);
-  console.log(
-    `Tỷ giá demo: 1 USD = ${USD_TO_VND.toLocaleString("vi-VN")} VND`,
-  );
+  for (const [name, count] of categoryCounts) {
+    console.log(`${name}: ${count}`);
+  }
 
   if (hasFlag("dry-run")) {
     console.log("\n========== XEM TRƯỚC ==========");
 
-    for (const item of unique.slice(0, 20)) {
-      const { product, category } = item;
-
+    for (const product of products.slice(0, 30)) {
       console.log(
-        `[${category.name}] ${product.title} | ` +
-        `${toVnd(getPrice(product)).toLocaleString("vi-VN")}đ | ` +
-        `${getImageUrls(product).length} ảnh`,
+        `[${product.category.name}] ${product.name}\n` +
+        `  Giá: ${product.price.toLocaleString("vi-VN")}₫\n` +
+        `  Thương hiệu: ${product.brand || "Không rõ"}\n` +
+        `  Ảnh: ${product.imageUrls.length}\n` +
+        `  Size: ${product.sizes.join(", ") || "Chưa rõ"}\n` +
+        `  Màu: ${product.colors.join(", ") || "Chưa rõ"}\n` +
+        `  Mã nguồn: ${product.sourceId}\n` +
+        `  Thử đồ: ${product.category.tryOnType}\n`,
       );
     }
 
-    console.log("\nDRY RUN: Không ghi dữ liệu vào database.");
+    if (hasFlag("clean-old")) {
+      console.log(
+        `DRY RUN: Có ${oldCount} sản phẩm cũ dự kiến được xóa.`,
+      );
+    }
+
+    console.log("DRY RUN: Không xóa hoặc ghi dữ liệu database.");
     return;
   }
 
-  // 3. Import sản phẩm.
+  let deleted = 0;
+
+  if (hasFlag("clean-old")) {
+    console.log("\nĐang xóa sản phẩm từ importer tiếng Anh cũ...");
+
+    deleted = await removeOldProducts();
+
+    console.log(`Đã xóa ${deleted} sản phẩm cũ.`);
+  }
+
   let created = 0;
   let skipped = 0;
   let failed = 0;
 
-  for (const item of unique) {
-    const { product: source, category: mappedCategory } = item;
+  console.log("\n========== IMPORT DATABASE ==========");
 
-    const imageUrls = getImageUrls(source);
-
-    if (imageUrls.length === 0 || getPrice(source) <= 0) {
-      skipped++;
-      console.log(`Bỏ qua sản phẩm thiếu ảnh hoặc giá: ${source.title}`);
-      continue;
-    }
-
-    const sourceSlug =
-      `demo-livostyle-${source.id}-${slugify(source.handle || source.title)}`;
+  for (const source of products) {
+    const slug = makeProductSlug(source);
 
     try {
-      // Không ghi đè sản phẩm cũ.
       const existing = await db.product.findUnique({
-        where: { slug: sourceSlug },
+        where: { slug },
         select: { id: true },
       });
 
       if (existing) {
         skipped++;
-        console.log(`Đã tồn tại, giữ nguyên: ${source.title}`);
+        console.log(`Đã tồn tại, giữ nguyên: ${source.name}`);
         continue;
       }
 
-      // Chỉ tạo category nếu chưa tồn tại.
       const category = await db.category.upsert({
-        where: { slug: mappedCategory.slug },
+        where: {
+          slug: source.category.slug,
+        },
         update: {},
         create: {
-          name: mappedCategory.name,
-          slug: mappedCategory.slug,
+          name: source.category.name,
+          slug: source.category.slug,
         },
       });
 
-      const price = toVnd(getPrice(source));
-      const salePrice = getSalePrice(source);
-
       const description = [
-        cleanDescription(source.description),
-        source.vendor
-          ? `Thương hiệu: ${source.vendor}.`
-          : "",
-        source.url
-          ? `Sản phẩm gốc: ${source.url}`
-          : "",
-        "Nguồn dữ liệu: Livostyle Women's Fashion Catalog.",
-      ].filter(Boolean).join("\n\n");
+        source.description,
+        source.brand ? `Thương hiệu: ${source.brand}.` : "",
+        `Nguồn tham khảo: ${source.sourceUrl}`,
+        "Nguồn dữ liệu: Dosi-in.",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
-      // Chỉ CREATE, không UPDATE hoặc DELETE sản phẩm.
       await db.product.create({
         data: {
-          name: source.title,
-          slug: sourceSlug,
+          name: source.name,
+          slug,
           description,
           material: null,
-          price,
-          salePrice:
-            salePrice !== null && salePrice < price
-              ? salePrice
-              : null,
-          soldCount: 0,
+          price: source.price,
+          salePrice: null,
+          soldCount: source.soldCount,
           isActive: true,
           categoryId: category.id,
-          tryOnType: mappedCategory.tryOnType,
+          tryOnType: source.category.tryOnType,
 
           images: {
-            create: imageUrls.map((url, position) => ({
+            create: source.imageUrls.map((url, position) => ({
               url,
               position,
             })),
@@ -503,18 +877,21 @@ async function main() {
       });
 
       created++;
-      console.log(`Đã thêm: ${source.title}`);
+      console.log(`Đã thêm: ${source.name}`);
     } catch (error) {
       failed++;
-      console.error(`Lỗi "${source.title}":`, error);
+      console.error(`Lỗi "${source.name}":`, error);
     }
   }
 
   console.log("\n========== KẾT QUẢ ==========");
-  console.log(`Tạo mới: ${created}`);
-  console.log(`Giữ nguyên: ${skipped}`);
-  console.log(`Lỗi: ${failed}`);
-  console.log("Không xóa hoặc cập nhật sản phẩm cũ.");
+  console.log(`Sản phẩm cào thành công: ${products.length}`);
+  console.log(`Sản phẩm cũ đã xóa: ${deleted}`);
+  console.log(`Sản phẩm mới đã thêm: ${created}`);
+  console.log(`Sản phẩm trùng được giữ nguyên: ${skipped}`);
+  console.log(`Sản phẩm lỗi: ${failed}`);
+
+  console.log("\nKhông cập nhật hoặc xóa sản phẩm Dosi-in đã có.");
 }
 
 main()
