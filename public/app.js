@@ -566,43 +566,101 @@ function products() {
 function formatProductDescription(value) {
   let text = String(value || '')
     .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]+/g, ' ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
-  // Tách các tiêu đề thành từng phần.
   const headings = [
     "Why you'll reach for it",
     "Why you'll love it",
     "Fabric & care",
     "Fit & sizing",
-    "Size Guide",
-    "Size",
-    "Product measurements, laid flat, in inches.",
     "Wear it with",
-    "Styling Suggestions",
-    "Additional Information",
-    "Thương hiệu:",
-    "Sản phẩm gốc:",
-    "Nguồn dữ liệu:"
+    "Size Guide",
+    "Product measurements in inches."
   ];
 
-  headings.forEach(heading => {
+  for (const heading of headings) {
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     text = text.replace(
-      new RegExp(`\\s*(${escaped})\\s*`, 'gi'),
-      '\n\n$1\n'
+      new RegExp(`\\s*${escaped}\\s*`, 'gi'),
+      `\n\n${heading}\n`
     );
-  });
+  }
 
-  // Tách các câu mô tả thành từng dòng dễ đọc.
+  // Tách thông tin thương hiệu và nguồn dữ liệu
   text = text
-    .replace(/\s+(Designed with|Made from|Available in sizes:|Stretch:|Not lined\.|Sheer:)/gi, '\n• $1')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/\s*Thương hiệu:\s*/gi, '\n\nThương hiệu: ')
+    .replace(/\s*Sản phẩm gốc:\s*/gi, '\n\nSản phẩm gốc: ')
+    .replace(/\s*Nguồn dữ liệu:\s*/gi, '\n\nNguồn dữ liệu: ');
 
-  return `<div class="product-description">${esc(text).replace(/\n/g, '<br>')}</div>`;
+  // Tách các ý trong phần mô tả
+  text = text
+    .replace(/\s+(V-neck with|95% polyester|Stretch:|Not lined\.|Available in sizes?)/gi, '\n• $1');
+
+  // Chuẩn hóa cụm "size s S to XL"
+  text = text.replace(/\bsize\s+s\s+S\s+to\s+XL\b/gi, 'sizes S to XL');
+
+  // Tạo bảng kích thước từ dữ liệu dạng Size Length Waist Bust ...
+  const tableMatch = text.match(
+    /Size\s+Length\s+Waist\s+Bust\s+S\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+M\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+L\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+XL\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i
+  );
+
+  let tableHtml = '';
+
+  if (tableMatch) {
+    const values = tableMatch.slice(1).map(Number);
+    const sizes = ['S', 'M', 'L', 'XL'];
+
+    tableHtml = `
+      <table class="product-size-table">
+        <thead>
+          <tr>
+            <th>Size</th>
+            <th>Length</th>
+            <th>Waist</th>
+            <th>Bust</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sizes.map((size, i) => `
+            <tr>
+              <td>${size}</td>
+              <td>${values[i * 3]}</td>
+              <td>${values[i * 3 + 1]}</td>
+              <td>${values[i * 3 + 2]}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    text = text.replace(tableMatch[0], '[[SIZE_TABLE]]');
+  }
+
+  const sections = text.split(/\n\n+/);
+
+  const html = sections.map(section => {
+    const content = section.trim();
+    if (!content) return '';
+
+    if (content === '[[SIZE_TABLE]]') {
+      return tableHtml;
+    }
+
+    if (/^(Why you'll reach for it|Why you'll love it|Fabric & care|Fit & sizing|Wear it with|Size Guide)$/i.test(content)) {
+      return `<h4>${esc(content)}</h4>`;
+    }
+
+    if (content.startsWith('•')) {
+      return `<p>${esc(content).replace(/\n•\s*/g, '<br>• ')}</p>`;
+    }
+
+    return `<p>${esc(content).replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+
+  return `<div class="product-description">${html}</div>`;
 }
-
 
 function detail() {
   const p = P(S.arg);
