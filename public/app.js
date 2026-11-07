@@ -895,19 +895,48 @@ function toHex6(c) {
   return /^#[0-9a-f]{6}$/i.test(x.fillStyle) ? x.fillStyle : '#000000';
 }
 
+/* Chuẩn hóa mã HEX: nhận #rrggbb / rrggbb / #rgb -> '#rrggbb' (viết thường), sai thì trả null. */
+function normHex(v) {
+  let h = String(v || '').trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(h)) h = h.replace(/./g, c => c + c);
+  return /^[0-9a-f]{6}$/i.test(h) ? '#' + h.toLowerCase() : null;
+}
+
 function acolor() {
   const used = {};
   db.products.forEach(p => p.colors.forEach(c => (used[c] = (used[c] || 0) + 1)));
   const names = [...new Set([...Object.keys(used), ...Object.keys(PALETTE)])].sort((x, y) => x.localeCompare(y, 'vi'));
   names.forEach(addColor);
-  return `<p class="mut">Chọn màu cho từng ô chọn màu ở trang sản phẩm. Màu lưu xong sẽ áp dụng ngay cho khách hàng.</p>
-<div class="box tw"><table><tr><th>Màu</th><th>Tên</th><th>Số sản phẩm</th><th>Chọn màu</th><th></th></tr>${names
-    .map(
-      n =>
-        `<tr><td><span class="sw" style="display:inline-block;background:${esc(COLS[n])};cursor:default"></span></td><td>${esc(n)}</td><td>${used[n] || 0}</td><td><input type="color" value="${toHex6(COLS[n])}" data-csname="${esc(n)}" style="width:56px;height:34px;padding:2px" aria-label="Màu ${esc(n)}"></td><td>${PALETTE[n] ? `<button class="btn o s" data-a="csreset" data-p="${esc(n)}">Đặt lại</button>` : ''}</td></tr>`
-    )
+  return `<p class="mut">Chọn màu bằng bảng màu hoặc nhập mã HEX (vd: #1f2a52). Màu lưu xong áp dụng ngay cho khách hàng. Bấm <b>Xóa</b> để gỡ hẳn một màu khỏi tất cả sản phẩm.</p>
+<div class="box tw"><table><tr><th>Màu</th><th>Tên</th><th>Số sản phẩm</th><th>Bảng màu / mã HEX</th><th></th></tr>${names
+    .map(n => {
+      const hx = toHex6(COLS[n]);
+      return `<tr><td><span class="sw" style="display:inline-block;background:${esc(COLS[n])};cursor:default"></span></td><td>${esc(n)}</td><td>${used[n] || 0}</td><td><div class="row" style="flex-wrap:nowrap;gap:6px"><input type="color" value="${hx}" data-csname="${esc(n)}" style="width:56px;height:34px;padding:2px" aria-label="Màu ${esc(n)}"><input type="text" value="${hx}" data-cshex="${esc(n)}" maxlength="7" placeholder="#RRGGBB" spellcheck="false" style="width:104px;font-family:monospace" aria-label="Mã HEX ${esc(n)}"></div></td><td><div class="row" style="flex-wrap:nowrap;gap:6px">${PALETTE[n] ? `<button class="btn o s" data-a="csreset" data-p="${esc(n)}">Đặt lại</button>` : ''}<button class="btn d s" data-a="csdel" data-p="${esc(n)}">Xóa</button></div></td></tr>`;
+    })
     .join('')}</table></div>
-<div class="box" style="margin-top:12px"><b>Thêm màu mới</b><div class="row" style="margin-top:8px"><input id="cs_n" placeholder="Tên màu, vd: Xanh navy" style="max-width:240px"><input id="cs_c" type="color" value="#1f2a52" style="width:56px;height:38px;padding:2px"><button class="btn" data-a="csadd">Thêm</button></div></div>`;
+<div class="box" style="margin-top:12px"><b>Thêm màu mới</b><div class="row" style="margin-top:8px"><input id="cs_n" placeholder="Tên màu, vd: Xanh navy" style="max-width:240px"><input id="cs_c" type="color" value="#1f2a52" style="width:56px;height:38px;padding:2px"><input id="cs_h" type="text" value="#1f2a52" maxlength="7" placeholder="#RRGGBB" spellcheck="false" style="width:104px;font-family:monospace" aria-label="Mã HEX"><button class="btn" data-a="csadd">Thêm</button></div></div>`;
+}
+
+/* Ô chỉnh màu trong form sản phẩm: bảng màu + mã HEX + tên + nút xóa. */
+function pcRow(name, hex) {
+  const hx = hex || toHex6(COLS[name] || colorHex(name || 'x'));
+  return `<div class="row pcrow" style="flex-wrap:nowrap;gap:6px;margin-bottom:6px"><input type="color" data-pcc value="${hx}" style="width:42px;height:36px;padding:2px;flex:none" aria-label="Chọn màu"><input data-pcn value="${esc(name)}" placeholder="Tên màu" style="min-width:0"><input data-pch value="${hx}" maxlength="7" placeholder="#RRGGBB" spellcheck="false" style="width:92px;flex:none;font-family:monospace" aria-label="Mã HEX"><button type="button" class="ib" data-a="pcdel" aria-label="Xóa màu" title="Xóa màu này">✕</button></div>`;
+}
+
+function pcSync() {
+  const names = [...document.querySelectorAll('#m_cols [data-pcn]')].map(i => i.value.trim()).filter(Boolean);
+  const m = $('#m_l');
+  if (m) m.value = [...new Set(names)].join(',');
+}
+
+/* Lưu màu đã chọn/nhập HEX trong form sản phẩm vào bảng màu chung (chỉ màu nào có thay đổi). */
+async function pcSave() {
+  pcSync();
+  for (const r of document.querySelectorAll('#m_cols .pcrow')) {
+    const n = r.querySelector('[data-pcn]').value.trim(),
+      h = normHex(r.querySelector('[data-pch]').value) || r.querySelector('[data-pcc]').value;
+    if (n && h && toHex6(COLS[n] || colorHex(n)) !== h) await saveSwatch(n, h);
+  }
 }
 
 async function saveSwatch(name, hex) {
@@ -926,13 +955,31 @@ async function resetSwatch(name) {
   } catch (e) { }
 }
 
+/* Xóa màu khỏi mọi sản phẩm (chế độ demo, không có API). Bản API được gán đè trong api.js. */
+async function purgeColor(name) {
+  const only = db.products.filter(p => p.colors.length === 1 && p.colors[0] === name).map(p => p.name);
+  if (only.length) throw new Error(`Không thể xóa: "${name}" là màu duy nhất của ${only.join(', ')}. Hãy thêm màu khác cho sản phẩm trước.`);
+  db.products.forEach(p => {
+    if (!p.colors.includes(name)) return;
+    p.colors = p.colors.filter(c => c !== name);
+    Object.keys(p.stock).forEach(k => k.split('|')[1] === name && delete p.stock[k]);
+  });
+  delete PALETTE[name];
+  delete COLS[name];
+  try {
+    localStorage.setItem('mono-palette', JSON.stringify(PALETTE));
+  } catch (e) { }
+  save();
+}
+
 const A = {};
 
 Object.assign(A, {
   csadd: async () => {
     const n = ($('#cs_n').value || '').trim(),
-      h = $('#cs_c').value;
+      h = normHex($('#cs_h').value);
     if (!n) return toast('Vui lòng nhập tên màu');
+    if (!h) return toast('Mã HEX không hợp lệ (vd: #1f2a52)');
     try {
       await saveSwatch(n, h);
       render();
@@ -950,6 +997,28 @@ Object.assign(A, {
       toast(e.message);
     }
   },
+  csdel: async n => {
+    if (!confirm(`Xóa màu "${n}" khỏi TẤT CẢ sản phẩm? Hành động không thể hoàn tác.`)) return;
+    try {
+      await purgeColor(n);
+      render();
+      toast('Đã xóa màu ' + n);
+    } catch (e) {
+      toast(e.message);
+    }
+  },
+  pcadd: () => {
+    const box = $('#m_cols');
+    if (!box) return;
+    box.insertAdjacentHTML('beforeend', pcRow('', '#1f2a52'));
+    const last = box.querySelector('.pcrow:last-child [data-pcn]');
+    if (last) last.focus();
+  },
+  pcdel: (p, t) => {
+    const r = t.closest('.pcrow');
+    if (r) r.remove();
+    pcSync();
+  },
   csreset: async n => {
     try {
       await resetSwatch(n);
@@ -961,9 +1030,44 @@ Object.assign(A, {
   }
 });
 
+/* Đồng bộ trực tiếp: kéo bảng màu -> ô HEX đổi theo; gõ HEX hợp lệ -> bảng màu đổi theo. */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (!t || !t.dataset) return;
+  const pair = (picker, hexIn) => {
+    if (t === picker && hexIn) hexIn.value = picker.value;
+    else if (t === hexIn && picker) {
+      const h = normHex(hexIn.value);
+      if (h) picker.value = h;
+    }
+  };
+  if (t.dataset.csname !== undefined || t.dataset.cshex !== undefined) {
+    const w = t.parentElement;
+    pair(w.querySelector('[data-csname]'), w.querySelector('[data-cshex]'));
+  } else if (t.id === 'cs_c' || t.id === 'cs_h') {
+    pair($('#cs_c'), $('#cs_h'));
+  } else if (t.dataset.pcc !== undefined || t.dataset.pch !== undefined) {
+    const w = t.closest('.pcrow');
+    pair(w.querySelector('[data-pcc]'), w.querySelector('[data-pch]'));
+  } else if (t.dataset.pcn !== undefined) pcSync();
+});
+
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t && t.dataset && t.dataset.csname !== undefined) A.cssave(t.dataset.csname, t.value);
+  if (!t || !t.dataset) return;
+  if (t.dataset.csname !== undefined) A.cssave(t.dataset.csname, t.value);
+  else if (t.dataset.cshex !== undefined) {
+    const h = normHex(t.value);
+    if (h) A.cssave(t.dataset.cshex, h);
+    else {
+      toast('Mã HEX không hợp lệ (vd: #1f2a52)');
+      render();
+    }
+  } else if (t.dataset.pch !== undefined) {
+    const w = t.closest('.pcrow'),
+      h = normHex(t.value);
+    t.value = h || w.querySelector('[data-pcc]').value;
+  }
 });
 
 function dash() {
@@ -1155,7 +1259,7 @@ function pform(p) {
     colors: ['Đen', 'Trắng'],
     stock: {}
   };
-  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu (cách nhau dấu phẩy, vd: Đen, Trắng, Xanh navy)</label><input id="m_l" value="${p.colors.join(',')}"></div></div>${n ? '' : stockGrid(p)}<div class="fld"><label>${n ? 'Tồn kho mỗi biến thể' : 'Tồn kho cho biến thể mới (khi thêm size/màu)'}</label><input id="m_k" type="number" min="0" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
+  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu sắc <span class="mut">(chọn màu hoặc nhập mã HEX, bấm ✕ để xóa)</span></label><div id="m_cols">${p.colors.map(c => pcRow(c)).join('')}</div><input id="m_l" type="hidden" value="${esc(p.colors.join(','))}"><button type="button" class="btn s o" data-a="pcadd">+ Thêm màu</button></div></div>${n ? '' : stockGrid(p)}<div class="fld"><label>${n ? 'Tồn kho mỗi biến thể' : 'Tồn kho cho biến thể mới (khi thêm size/màu)'}</label><input id="m_k" type="number" min="0" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
 }
 
 function pimgsHtml() {
@@ -1667,7 +1771,8 @@ Object.assign(A, {
     if (t.classList.contains('ov') && e.target !== t) return;
     modal('');
   },
-  psv: p => {
+  psv: async p => {
+    await pcSave().catch(e => toast(e.message));
     const g = i => $('#' + i).value.trim(),
       er = $('#merr'),
       price = +g('m_p'),

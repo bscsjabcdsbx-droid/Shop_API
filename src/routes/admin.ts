@@ -43,6 +43,8 @@ r.put("/products/:id", wrap(async (req, res) => {
   const { images, variants, ...d } = productSchema.parse(req.body);
   res.json(await db.$transaction(async tx => {
     await tx.productImage.deleteMany({ where: { productId: id } });
+    // Biến thể (size/màu) không còn trong danh sách gửi lên thì xóa luôn; mục giỏ hàng xóa theo, chi tiết đơn hàng giữ lại (variantId = null).
+    await tx.productVariant.deleteMany({ where: { productId: id, NOT: { OR: variants.map(v => ({ size: v.size, color: v.color })) } } });
     for (const v of variants) await tx.productVariant.upsert({ where: { productId_size_color: { productId: id, size: v.size, color: v.color } }, update: { stock: v.stock }, create: { ...v, productId: id } });
     return tx.product.update({ where: { id }, data: { ...d, images: { create: images.map((url, position) => ({ url, position })) } } });
   }));

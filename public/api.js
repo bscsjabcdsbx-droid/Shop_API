@@ -229,6 +229,12 @@
       delete PALETTE[name];
       COLS[name] = colorHex(name);
     };
+    purgeColor = async function (name) {
+      await rq('/colors/' + encodeURIComponent(name) + '/products', { method: 'DELETE' });
+      delete PALETTE[name];
+      delete COLS[name];
+      await reloadProducts();
+    };
   }
   async function loadCats() {
     (await rq('/products/categories')).forEach(c => {
@@ -634,6 +640,7 @@
       }
     };
     A.psv = async p => {
+      await pcSave().catch(e => toast(e.message));
       const g = i => $('#' + i).value.trim(),
         er = $('#merr'),
         price = +g('m_p'),
