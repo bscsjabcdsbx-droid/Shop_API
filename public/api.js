@@ -168,19 +168,48 @@
   /* ==========================================================================
    4. NẠP DỮ LIỆU TỪ SERVER
    ========================================================================== */
+  
   async function loadProducts() {
-    const d = await rq('/products?limit=48');
-    db.products = d.items.map(mapP);
+    // Tải trang đầu tiên.
+    const first = await rq('/products?limit=48&page=1');
+
+    // Tải các trang còn lại.
+    const remainingPages = await Promise.all(
+      Array.from(
+        { length: Math.max(0, first.totalPages - 1) },
+        (_, index) =>
+          rq(`/products?limit=48&page=${index + 2}`)
+      )
+    );
+
+    // Gộp toàn bộ sản phẩm.
+    const items = [
+      ...first.items,
+      ...remainingPages.flatMap(page => page.items)
+    ];
+
+    db.products = items.map(mapP);
+
+    // Cập nhật ánh xạ biến thể.
     VM = {};
+
     db.products.forEach(p =>
       Object.values(p.vid).forEach(v => {
         VM[v] = p.id;
       })
     );
-    d.items.forEach(p => {
-      db.reviews[p.id] = Array.from({ length: p.reviewCount }, () => ({ r: p.rating, u: '', c: '' }));
+
+    // Cập nhật đánh giá.
+    items.forEach(p => {
+      db.reviews[p.id] = Array.from(
+        { length: p.reviewCount },
+        () => ({ r: p.rating, u: '', c: '' })
+      );
     });
+
+    console.log(`Đã tải ${items.length}/${first.total} sản phẩm.`);
   }
+
   async function loadCats() {
     (await rq('/products/categories')).forEach(c => {
       CATIDS[c.slug] = c.id;
