@@ -566,50 +566,19 @@ function products() {
 function formatProductDescription(value) {
   let text = String(value || '')
     .replace(/\r\n?/g, '\n')
-    .replace(/\n+/g, ' ')
+    .replace(/\\(?=\s|$)/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  const headings = [
-    "Why you'll reach for it",
-    "Why you'll love it",
-    "Fabric & care",
-    "Fit & sizing",
-    "Wear it with",
-    "Size Guide",
-    "Product measurements in inches."
-  ];
+  // 1. Nhận diện bảng size trước khi chia đoạn văn
+  const tableRegex =
+    /\bSize\s+Length\s+Waist\s+Bust\s+S\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+M\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+L\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+XL\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i;
 
-  for (const heading of headings) {
-    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    text = text.replace(
-      new RegExp(`\\s*${escaped}\\s*`, 'gi'),
-      `\n\n${heading}\n`
-    );
-  }
-
-  // Tách thông tin thương hiệu và nguồn dữ liệu
-  text = text
-    .replace(/\s*Thương hiệu:\s*/gi, '\n\nThương hiệu: ')
-    .replace(/\s*Sản phẩm gốc:\s*/gi, '\n\nSản phẩm gốc: ')
-    .replace(/\s*Nguồn dữ liệu:\s*/gi, '\n\nNguồn dữ liệu: ');
-
-  // Tách các ý trong phần mô tả
-  text = text
-    .replace(/\s+(V-neck with|95% polyester|Stretch:|Not lined\.|Available in sizes?)/gi, '\n• $1');
-
-  // Chuẩn hóa cụm "size s S to XL"
-  text = text.replace(/\bsize\s+s\s+S\s+to\s+XL\b/gi, 'sizes S to XL');
-
-  // Tạo bảng kích thước từ dữ liệu dạng Size Length Waist Bust ...
-  const tableMatch = text.match(
-    /Size\s+Length\s+Waist\s+Bust\s+S\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+M\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+L\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+XL\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i
-  );
-
+  const tableMatch = text.match(tableRegex);
   let tableHtml = '';
 
   if (tableMatch) {
-    const values = tableMatch.slice(1).map(Number);
+    const values = tableMatch.slice(1);
     const sizes = ['S', 'M', 'L', 'XL'];
 
     tableHtml = `
@@ -635,25 +604,74 @@ function formatProductDescription(value) {
       </table>
     `;
 
-    text = text.replace(tableMatch[0], '[[SIZE_TABLE]]');
+    // Đặt placeholder thành một đoạn riêng biệt
+    text = text.replace(tableRegex, '\n\n[[SIZE_TABLE]]\n\n');
   }
 
+  // 2. Tách các tiêu đề
+  const headings = [
+    "Why you'll reach for it",
+    "Why you'll love it",
+    "Fabric & care",
+    "Fit & sizing",
+    "Wear it with"
+  ];
+
+  for (const heading of headings) {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    text = text.replace(
+      new RegExp(`\\s*(${escaped})\\s*`, 'gi'),
+      '\n\n$1\n'
+    );
+  }
+
+  // 3. Tách thông tin thương hiệu và nguồn
+  text = text
+    .replace(/\s*Thương hiệu:\s*/gi, '\n\nThương hiệu: ')
+    .replace(/\s*Sản phẩm gốc:\s*/gi, '\n\nSản phẩm gốc: ')
+    .replace(/\s*Nguồn dữ liệu:\s*/gi, '\n\nNguồn dữ liệu: ');
+
+  // 4. Tách danh sách
+  text = text
+    .replace(/\s+(V-neck with|Stretch:|Not lined\.|Available in sizes?)/gi, '\n• $1')
+    .replace(/\s+(Machine wash cold\.)/gi, '\n• $1')
+    .replace(/\s+(Tumble dry low\.)/gi, ' $1');
+
+  // 5. Chuẩn hóa khoảng trắng
+  text = text
+    .replace(/\n[ \t]*/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\[\[SIZE_TABLE\]\]/g, '\n\n[[SIZE_TABLE]]\n\n')
+    .trim();
+
+  // 6. Chuyển từng phần thành HTML
   const sections = text.split(/\n\n+/);
 
   const html = sections.map(section => {
     const content = section.trim();
+
     if (!content) return '';
 
+    // Hiển thị bảng size thật
     if (content === '[[SIZE_TABLE]]') {
-      return tableHtml;
+      return tableHtml || '';
     }
 
-    if (/^(Why you'll reach for it|Why you'll love it|Fabric & care|Fit & sizing|Wear it with|Size Guide)$/i.test(content)) {
+    // Tiêu đề
+    if (headings.some(h => h.toLowerCase() === content.toLowerCase())) {
       return `<h4>${esc(content)}</h4>`;
     }
 
+    // Danh sách
     if (content.startsWith('•')) {
-      return `<p>${esc(content).replace(/\n•\s*/g, '<br>• ')}</p>`;
+      const items = content
+        .split('\n')
+        .map(item => item.replace(/^•\s*/, '').trim())
+        .filter(Boolean);
+
+      return `<ul>${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
     }
 
     return `<p>${esc(content).replace(/\n/g, '<br>')}</p>`;
