@@ -463,7 +463,7 @@ async function main() {
       // Chỉ CREATE, không UPDATE hoặc DELETE sản phẩm.
       await db.product.create({
         data: {
-          name: `[Demo] ${source.title}`,
+          name: source.title,
           slug: sourceSlug,
           description,
           material: null,
