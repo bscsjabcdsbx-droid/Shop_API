@@ -33,16 +33,14 @@ const CONFIG = {
     { cat: 'khoac', title: 'Thu đông 2026', image: '' },
     { cat: 'ao', title: 'Basic hằng ngày', image: '' },
     { cat: 'quan', title: 'Denim & Kaki', image: '' },
-    { cat: 'vay', title: 'Váy mùa mới', image: '' },
-    { cat: 'pk', title: 'Phụ kiện điểm nhấn', image: '' }
+    { cat: 'vay', title: 'Váy mùa mới', image: '' }
   ],
   /* Ảnh thẻ danh mục ở trang chủ; để '' dùng ảnh minh họa. */
   categoryImages: {
     ao: 'images/categories/ao.jpg',
     quan: 'images/categories/quan.jpg',
     vay: 'images/categories/vay.jpg',
-    khoac: 'images/categories/ao-khoac.jpg',
-    pk: 'images/categories/phu-kien.jpg'
+    khoac: 'images/categories/ao-khoac.jpg'
   }
 };
 
@@ -98,11 +96,64 @@ const CATS = [
   ['ao', 'Áo', '#d9d4cc'],
   ['quan', 'Quần', '#c9ced6'],
   ['vay', 'Váy', '#e3d2d2'],
-  ['khoac', 'Áo khoác', '#bfc7bd'],
-  ['pk', 'Phụ kiện', '#d6cfbf']
+  ['khoac', 'Áo khoác', '#bfc7bd']
 ];
 
+/* Danh mục đã gỡ khỏi cửa hàng: không hiển thị dù dữ liệu cũ còn tồn tại. */
+const HIDDEN_CATS = ['pk'];
+const catOf = s => CATS.find(c => c[0] === s) || [s, s, '#d9d4cc'];
+
+/* Bảng màu động: màu nào xuất hiện ở biến thể sản phẩm thì tự được đăng ký (addColor). */
 const COLS = { Đen: '#111', Trắng: '#f4f4f4', Xám: '#8a8a8a' };
+
+const COLOR_HEX = {
+  den: '#111', black: '#111', trang: '#f4f4f4', white: '#f4f4f4', 'trang kem': '#f3ead3',
+  xam: '#8a8a8a', ghi: '#8a8a8a', gray: '#8a8a8a', grey: '#8a8a8a', 'xam nhat': '#cfcfcf', 'xam dam': '#555',
+  do: '#d32f2f', red: '#d32f2f', 'do ruou': '#7a1f2b', burgundy: '#7a1f2b', 'do dam': '#8e1b1b',
+  hong: '#f4a6c0', pink: '#f4a6c0', 'hong dam': '#d6457f', 'hong phan': '#f6c9d4',
+  cam: '#f28c28', orange: '#f28c28', 'cam dat': '#c0643a', terracotta: '#c0643a',
+  vang: '#f2d03b', yellow: '#f2d03b', 'vang dong': '#c9a227', gold: '#c9a227', mustard: '#d4a82b',
+  'xanh la': '#3f9b5b', green: '#3f9b5b', 'xanh reu': '#6b7a3a', olive: '#6b7a3a', 'xanh mint': '#a8dcc4', mint: '#a8dcc4',
+  'xanh ro': '#4b5a3a', 'xanh quan doi': '#4b5a3a', army: '#4b5a3a', 'xanh la dam': '#1f5d3a', 'xanh la nhat': '#a5d6a7',
+  'xanh duong': '#2f6fd6', blue: '#2f6fd6', 'xanh dam': '#1f3a8a', 'xanh nhat': '#9cc3f0', 'xanh bien': '#2f6fd6',
+  'xanh navy': '#1f2a52', navy: '#1f2a52', 'xanh den': '#1f2a52', 'xanh than': '#1f2a52',
+  'xanh ngoc': '#1b9aa3', teal: '#1b9aa3', 'xanh co vit': '#1b7f86', 'xanh lam': '#2f6fd6',
+  denim: '#4a6fa5', jean: '#4a6fa5',
+  tim: '#7e57c2', purple: '#7e57c2', violet: '#7e57c2', 'tim than': '#4a2d73', lavender: '#b9a6e3', 'tim nhat': '#b9a6e3',
+  nau: '#7b4a2d', brown: '#7b4a2d', 'nau do': '#8a3d2a', coffee: '#5b3a29', 'nau nhat': '#a98467', camel: '#c19a6b',
+  be: '#e0d2b8', beige: '#e0d2b8', kem: '#f3ead3', cream: '#f3ead3', 'ghi be': '#d9cdb5', khaki: '#b8a88a', 'xanh kaki': '#b8a88a',
+  bac: '#c0c0c0', silver: '#c0c0c0', coral: '#f0745f', 'san ho': '#f0745f', rose: '#d98b99'
+};
+const COLOR_KEYS = Object.keys(COLOR_HEX).sort((x, y) => y.length - x.length);
+
+/* Màu do admin chỉnh trong trang quản trị (tên màu -> #rrggbb), ưu tiên hơn màu tự nhận diện. */
+const PALETTE = {};
+try {
+  Object.assign(PALETTE, JSON.parse(localStorage.getItem('mono-palette') || '{}'));
+} catch (e) { }
+
+function applyPalette() {
+  Object.keys(PALETTE).forEach(n => (COLS[n] = PALETTE[n]));
+}
+
+function colorHex(name) {
+  if (PALETTE[name]) return PALETTE[name];
+  const k = norm(String(name)).replace(/\s+/g, ' ').trim();
+  if (COLOR_HEX[k]) return COLOR_HEX[k];
+  const hit = COLOR_KEYS.find(w => (' ' + k + ' ').includes(' ' + w + ' '));
+  if (hit) return COLOR_HEX[hit];
+  if (window.CSS && CSS.supports && CSS.supports('color', k)) return k;
+  let h = 0;
+  for (const ch of k) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h}, 42%, 56%)`;
+}
+
+function addColor(name) {
+  name = String(name || '').trim();
+  if (name && !COLS[name]) COLS[name] = colorHex(name);
+  return name;
+}
+applyPalette();
 
 function getCols() {
   return (
@@ -119,7 +170,7 @@ function getCols() {
 }
 
 function activeCols() {
-  return getCols().filter(c => c.active);
+  return getCols().filter(c => c.active && !HIDDEN_CATS.includes(c.cat));
 }
 
 const STAT = ['Chờ xác nhận', 'Đã xác nhận', 'Đang chuẩn bị', 'Đang giao', 'Đã giao', 'Đã hủy'];
@@ -130,8 +181,7 @@ const NAMES = {
   ao: ['Áo thun basic', 'Áo sơ mi linen', 'Áo polo pique', 'Áo len cổ tròn'],
   quan: ['Quần jean slim', 'Quần kaki ống đứng', 'Quần short linen', 'Quần jogger nỉ'],
   vay: ['Váy midi xếp ly', 'Váy sơ mi dáng dài', 'Váy suông cotton', 'Chân váy chữ A'],
-  khoac: ['Áo khoác bomber', 'Áo khoác denim', 'Áo blazer oversize', 'Áo khoác gió'],
-  pk: ['Mũ lưỡi trai', 'Thắt lưng da', 'Khăn lụa', 'Túi tote canvas']
+  khoac: ['Áo khoác bomber', 'Áo khoác denim', 'Áo blazer oversize', 'Áo khoác gió']
 };
 
 /* ==========================================================================
@@ -142,7 +192,7 @@ let db,
   S = {
     view: 'home',
     arg: null,
-    f: { q: '', cat: '', sort: 'new', size: '', color: '', stock: false, min: '', max: '', page: 1 },
+    f: { q: '', cat: '', sort: 'new', size: '', stock: false, min: '', max: '', page: 1 },
     sel: {},
     img: 0,
     adm: 'dash',
@@ -227,7 +277,7 @@ async function init() {
     for (const name of NAMES[c]) {
       n++;
       const price = (150 + ((n * 37) % 600)) * 1000,
-        sizes = c === 'pk' ? ['FREE'] : ['S', 'M', 'L', 'XL'],
+        sizes = ['S', 'M', 'L', 'XL'],
         colors = Object.keys(COLS).slice(0, 2 + (n % 2)),
         stock = {};
       sizes.forEach(s =>
@@ -293,7 +343,7 @@ async function init() {
    ========================================================================== */
 
 function svgImg(p, i = 0) {
-  const c = CATS.find(c => c[0] === p.cat)[2];
+  const c = catOf(p.cat)[2];
   return (
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(
@@ -486,20 +536,18 @@ function startCar() {
   8. TRANG SẢN PHẨM (danh sách, bộ lọc, chi tiết)
    ========================================================================== */
 
-function filt() {
-  const f = S.f;
-  let l = db.products.filter(
+function filt(f = S.f) {
+  const l = db.products.filter(
     p =>
+      !HIDDEN_CATS.includes(p.cat) &&
       (!f.q || p.name.toLowerCase().includes(f.q.toLowerCase())) &&
-      (!f.cat || p.cat === f.cat) &&
+      (!f.cat || f.cat === 'sale' || p.cat === f.cat) &&
       (!f.min || pp(p) >= +f.min) &&
       (!f.max || pp(p) <= +f.max) &&
       (f.cat !== 'sale' || p.sale) &&
       (!f.size || p.sizes.includes(f.size)) &&
-      (!f.color || p.colors.includes(f.color)) &&
       (!f.stock || instock(p))
   );
-  if (f.cat === 'sale') l = db.products.filter(p => p.sale);
   const o = {
     new: (a, b) => b.date - a.date,
     pa: (a, b) => pp(a) - pp(b),
@@ -510,7 +558,8 @@ function filt() {
   return l.sort(o[f.sort]);
 }
 
-const PAGE_SIZE = 9;
+
+const PAGE_SIZE = 12;
 
 function pagerItems(cur, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -545,14 +594,8 @@ function products() {
  <label>Danh mục</label><select data-f="cat"><option value="">Tất cả</option><option value="sale"${f.cat === 'sale' ? ' selected' : ''}>Khuyến mãi</option>${CATS.map(c => `<option value="${c[0]}"${f.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select>
  <label>Giá (₫)</label><div class="f2"><input data-f="min" type="number" min="0" placeholder="Từ" value="${f.min}"><input data-f="max" type="number" min="0" placeholder="Đến" value="${f.max}"></div>
  <label>Size</label><div class="chips">${sizes.map(s => `<button class="chip${f.size === s ? ' on' : ''}" data-a="fs" data-p="size:${s}">${s}</button>`).join('')}</div>
- <label>Màu sắc</label><div class="row">${Object.entries(COLS)
-      .map(
-        ([n, c]) =>
-          `<button class="sw${f.color === n ? ' on' : ''}" style="background:${c}" data-a="fs" data-p="color:${n}" aria-label="${n}"></button>`
-      )
-      .join('')}</div>
  <label><input type="checkbox" data-f="stock" style="width:auto"${f.stock ? ' checked' : ''}> Chỉ còn hàng</label><button class="btn o s" style="margin-top:12px" data-a="reset">Xóa bộ lọc</button></aside>`;
-  return `<div class="lay">${side}<section><div class="row" style="justify-content:space-between;margin-bottom:14px"><h1 style="margin:0;font-size:22px">${f.cat && f.cat !== 'sale' ? CATS.find(c => c[0] === f.cat)[1] : f.cat === 'sale' ? 'Khuyến mãi' : 'Tất cả sản phẩm'} <span class="mut" style="font-size:14px">(${l.length})</span></h1><div class="row"><button class="btn o s mo" data-a="side">Bộ lọc</button><select data-f="sort" style="width:auto" aria-label="Sắp xếp"><option value="new">Mới nhất</option><option value="pa"${f.sort === 'pa' ? ' selected' : ''}>Giá thấp → cao</option><option value="pd"${f.sort === 'pd' ? ' selected' : ''}>Giá cao → thấp</option><option value="best"${f.sort === 'best' ? ' selected' : ''}>Bán chạy</option><option value="rate"${f.sort === 'rate' ? ' selected' : ''}>Đánh giá cao</option></select></div></div>
+  return `<div class="lay">${side}<section><div class="row" style="justify-content:space-between;margin-bottom:14px"><h1 style="margin:0;font-size:22px">${f.cat && f.cat !== 'sale' ? catOf(f.cat)[1] : f.cat === 'sale' ? 'Khuyến mãi' : 'Tất cả sản phẩm'} <span class="mut" style="font-size:14px">(${l.length})</span></h1><div class="row"><button class="btn o s mo" data-a="side">Bộ lọc</button><select data-f="sort" style="width:auto" aria-label="Sắp xếp"><option value="new">Mới nhất</option><option value="pa"${f.sort === 'pa' ? ' selected' : ''}>Giá thấp → cao</option><option value="pd"${f.sort === 'pd' ? ' selected' : ''}>Giá cao → thấp</option><option value="best"${f.sort === 'best' ? ' selected' : ''}>Bán chạy</option><option value="rate"${f.sort === 'rate' ? ' selected' : ''}>Đánh giá cao</option></select></div></div>
  ${l.length
       ? `<div class="grid">${l
         .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -563,137 +606,20 @@ function products() {
  ${pager(page, pg)}</section></div>`;
 }
 
-function formatProductDescription(value) {
-  let text = String(value || '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\\(?=\s|$)/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  // 1. Nhận diện bảng size trước khi chia đoạn văn
-  const tableRegex =
-    /\bSize\s+Length\s+Waist\s+Bust\s+S\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+M\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+L\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+XL\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i;
-
-  const tableMatch = text.match(tableRegex);
-  let tableHtml = '';
-
-  if (tableMatch) {
-    const values = tableMatch.slice(1);
-    const sizes = ['S', 'M', 'L', 'XL'];
-
-    tableHtml = `
-      <table class="product-size-table">
-        <thead>
-          <tr>
-            <th>Size</th>
-            <th>Length</th>
-            <th>Waist</th>
-            <th>Bust</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sizes.map((size, i) => `
-            <tr>
-              <td>${size}</td>
-              <td>${values[i * 3]}</td>
-              <td>${values[i * 3 + 1]}</td>
-              <td>${values[i * 3 + 2]}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-
-    // Đặt placeholder thành một đoạn riêng biệt
-    text = text.replace(tableRegex, '\n\n[[SIZE_TABLE]]\n\n');
-  }
-
-  // 2. Tách các tiêu đề
-  const headings = [
-    "Why you'll reach for it",
-    "Why you'll love it",
-    "Fabric & care",
-    "Fit & sizing",
-    "Wear it with"
-  ];
-
-  for (const heading of headings) {
-    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    text = text.replace(
-      new RegExp(`\\s*(${escaped})\\s*`, 'gi'),
-      '\n\n$1\n'
-    );
-  }
-
-  // 3. Tách thông tin thương hiệu và nguồn
-  text = text
-    .replace(/\s*Thương hiệu:\s*/gi, '\n\nThương hiệu: ')
-    .replace(/\s*Sản phẩm gốc:\s*/gi, '\n\nSản phẩm gốc: ')
-    .replace(/\s*Nguồn dữ liệu:\s*/gi, '\n\nNguồn dữ liệu: ');
-
-  // 4. Tách danh sách
-  text = text
-    .replace(/\s+(V-neck with|Stretch:|Not lined\.|Available in sizes?)/gi, '\n• $1')
-    .replace(/\s+(Machine wash cold\.)/gi, '\n• $1')
-    .replace(/\s+(Tumble dry low\.)/gi, ' $1');
-
-  // 5. Chuẩn hóa khoảng trắng
-  text = text
-    .replace(/\n[ \t]*/g, '\n')
-    .replace(/[ \t]*\n[ \t]*/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/\[\[SIZE_TABLE\]\]/g, '\n\n[[SIZE_TABLE]]\n\n')
-    .trim();
-
-  // 6. Chuyển từng phần thành HTML
-  const sections = text.split(/\n\n+/);
-
-  const html = sections.map(section => {
-    const content = section.trim();
-
-    if (!content) return '';
-
-    // Hiển thị bảng size thật
-    if (content === '[[SIZE_TABLE]]') {
-      return tableHtml || '';
-    }
-
-    // Tiêu đề
-    if (headings.some(h => h.toLowerCase() === content.toLowerCase())) {
-      return `<h4>${esc(content)}</h4>`;
-    }
-
-    // Danh sách
-    if (content.startsWith('•')) {
-      const items = content
-        .split('\n')
-        .map(item => item.replace(/^•\s*/, '').trim())
-        .filter(Boolean);
-
-      return `<ul>${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
-    }
-
-    return `<p>${esc(content).replace(/\n/g, '<br>')}</p>`;
-  }).join('');
-
-  return `<div class="product-description">${html}</div>`;
-}
-
 function detail() {
   const p = P(S.arg);
   if (!p) return '<div class="empty">Không tìm thấy sản phẩm.</div>';
-  const s = S.sel,
-    im = p.images && p.images.length ? p.images.map((_, i) => i) : [0, 1, 2],
+  const s = S.sel;
+  const im = p.images && p.images.length ? p.images.map((_, i) => i) : [0, 1, 2],
     av = (sz, cl) => p.stock[sz + '|' + cl] || 0;
   const max = s.size && s.color ? av(s.size, s.color) : 0,
     w = (db.wish[key()] || []).includes(p.id),
     rv = db.reviews[p.id] || [],
     rel = db.products.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
   return `<div class="det"><div><img class="big" src="${img(p, S.img)}" alt="${esc(p.name)}"><div class="th">${im.map(i => `<img src="${img(p, i)}" class="${S.img === i ? 'on' : ''}" data-a="gi" data-p="${i}" alt="Ảnh ${i + 1}">`).join('')}</div></div>
- <div><span class="mut">${CATS.find(c => c[0] === p.cat)[1]}</span><h1>${esc(p.name)}</h1><div class="st">${stars(rate(p))} <span class="mut">${rate(p).toFixed(1)} (${rv.length} đánh giá)</span></div>
- <p class="pr"><b style="font-size:24px">${vnd(pp(p))}</b>${p.sale ? `<s>${vnd(p.price)}</s> <span class="badge">-${Math.round(100 - (p.sale / p.price) * 100)}%</span>` : ''}</p>${formatProductDescription(p.desc)}
- <b>Màu sắc</b><div class="row" style="margin:6px 0 14px">${p.colors.map(c => `<button class="sw${s.color === c ? ' on' : ''}" style="background:${COLS[c]}" data-a="sel" data-p="color:${c}" aria-label="${c}" title="${c}"></button>`).join('')}</div>
+ <div><span class="mut">${catOf(p.cat)[1]}</span><h1>${esc(p.name)}</h1><div class="st">${stars(rate(p))} <span class="mut">${rate(p).toFixed(1)} (${rv.length} đánh giá)</span></div>
+ <p class="pr"><b style="font-size:24px">${vnd(pp(p))}</b>${p.sale ? `<s>${vnd(p.price)}</s> <span class="badge">-${Math.round(100 - (p.sale / p.price) * 100)}%</span>` : ''}</p><p class="mut">${esc(p.desc)}</p>
+ <b>Màu sắc</b><div class="row" style="margin:6px 0 14px">${p.colors.map(c => `<button class="sw${s.color === c ? ' on' : ''}" style="background:${COLS[addColor(c)]}" data-a="sel" data-p="color:${c}" aria-label="${c}" title="${c}"></button>`).join('')}</div>
  <b>Size</b><div class="chips" style="margin:6px 0 14px">${p.sizes
       .map(z => {
         const out = s.color ? av(z, s.color) < 1 : p.colors.every(c => av(z, c) < 1);
@@ -947,6 +873,7 @@ function admin() {
   const tabs = [
     ['dash', 'Tổng quan'],
     ['aprod', 'Sản phẩm'],
+    ['acolor', 'Màu sắc'],
     ['acol', 'Bộ sưu tập'],
     ['aord', 'Đơn hàng'],
     ['acp', 'Mã giảm giá'],
@@ -956,9 +883,86 @@ function admin() {
   ];
   return (
     `<div class="tabs">${tabs.map(t => `<button class="chip${S.adm === t[0] ? ' on' : ''}" data-a="atab" data-p="${t[0]}">${t[1]}${t[0] === 'achat' && CH.ad.unread ? ` <span class="cnt2">${CH.ad.unread}</span>` : t[0] === 'abk' && BK.pending ? ` <span class="cnt2">${BK.pending}</span>` : ''}</button>`).join('')}</div>` +
-    { dash: dash, aprod: aprod, aord: aord, acus: acus, acol: acol, acp: acp, abk: abk, achat: achat }[S.adm]()
+    { dash: dash, aprod: aprod, acolor: acolor, aord: aord, acus: acus, acol: acol, acp: acp, abk: abk, achat: achat }[S.adm]()
   );
 }
+
+/* Admin: chỉnh màu hiển thị của các ô chọn màu ở trang sản phẩm. */
+function toHex6(c) {
+  const x = document.createElement('canvas').getContext('2d');
+  x.fillStyle = '#000';
+  x.fillStyle = c;
+  return /^#[0-9a-f]{6}$/i.test(x.fillStyle) ? x.fillStyle : '#000000';
+}
+
+function acolor() {
+  const used = {};
+  db.products.forEach(p => p.colors.forEach(c => (used[c] = (used[c] || 0) + 1)));
+  const names = [...new Set([...Object.keys(used), ...Object.keys(PALETTE)])].sort((x, y) => x.localeCompare(y, 'vi'));
+  names.forEach(addColor);
+  return `<p class="mut">Chọn màu cho từng ô chọn màu ở trang sản phẩm. Màu lưu xong sẽ áp dụng ngay cho khách hàng.</p>
+<div class="box tw"><table><tr><th>Màu</th><th>Tên</th><th>Số sản phẩm</th><th>Chọn màu</th><th></th></tr>${names
+    .map(
+      n =>
+        `<tr><td><span class="sw" style="display:inline-block;background:${esc(COLS[n])};cursor:default"></span></td><td>${esc(n)}</td><td>${used[n] || 0}</td><td><input type="color" value="${toHex6(COLS[n])}" data-csname="${esc(n)}" style="width:56px;height:34px;padding:2px" aria-label="Màu ${esc(n)}"></td><td>${PALETTE[n] ? `<button class="btn o s" data-a="csreset" data-p="${esc(n)}">Đặt lại</button>` : ''}</td></tr>`
+    )
+    .join('')}</table></div>
+<div class="box" style="margin-top:12px"><b>Thêm màu mới</b><div class="row" style="margin-top:8px"><input id="cs_n" placeholder="Tên màu, vd: Xanh navy" style="max-width:240px"><input id="cs_c" type="color" value="#1f2a52" style="width:56px;height:38px;padding:2px"><button class="btn" data-a="csadd">Thêm</button></div></div>`;
+}
+
+async function saveSwatch(name, hex) {
+  PALETTE[name] = hex;
+  COLS[name] = hex;
+  try {
+    localStorage.setItem('mono-palette', JSON.stringify(PALETTE));
+  } catch (e) { }
+}
+
+async function resetSwatch(name) {
+  delete PALETTE[name];
+  COLS[name] = colorHex(name);
+  try {
+    localStorage.setItem('mono-palette', JSON.stringify(PALETTE));
+  } catch (e) { }
+}
+
+Object.assign(A, {
+  csadd: async () => {
+    const n = ($('#cs_n').value || '').trim(),
+      h = $('#cs_c').value;
+    if (!n) return toast('Vui lòng nhập tên màu');
+    try {
+      await saveSwatch(n, h);
+      render();
+      toast('Đã lưu màu ' + n);
+    } catch (e) {
+      toast(e.message);
+    }
+  },
+  cssave: async (n, h) => {
+    try {
+      await saveSwatch(n, h);
+      render();
+      toast('Đã đổi màu ' + n);
+    } catch (e) {
+      toast(e.message);
+    }
+  },
+  csreset: async n => {
+    try {
+      await resetSwatch(n);
+      render();
+      toast('Đã đặt lại màu ' + n);
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t && t.dataset && t.dataset.csname !== undefined) A.cssave(t.dataset.csname, t.value);
+});
 
 function dash() {
   const ok = db.orders.filter(o => o.status === 4),
@@ -1002,7 +1006,7 @@ function dash() {
 function aprod() {
   const q = S.aq.toLowerCase(),
     l = db.products.filter(p => !q || p.name.toLowerCase().includes(q));
-  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}${p.active === false ? ' <span class="badge">Đã ẩn</span>' : ''}</div></td><td>${CATS.find(c => c[0] === p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${(t => (t > 0 ? t : '<span class="badge c5">Hết hàng</span>'))(Object.values(p.stock).reduce((a, b) => a + b, 0))}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
+  return `<div class="row" style="margin-bottom:12px"><input data-f="aq" style="max-width:280px" placeholder="Tìm sản phẩm" value="${esc(S.aq)}"><button class="btn" data-a="pedit" data-p="0">+ Thêm sản phẩm</button></div><div class="box tw"><table><tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá</th><th>Tồn kho</th><th></th></tr>${l.map(p => `<tr><td><div class="row" style="flex-wrap:nowrap"><img src="${img(p, 0)}" alt="" style="width:36px;height:45px;object-fit:cover;border-radius:6px">${esc(p.name)}${p.active === false ? ' <span class="badge">Đã ẩn</span>' : ''}</div></td><td>${catOf(p.cat)[1]}</td><td>${vnd(pp(p))}</td><td>${(t => (t > 0 ? t : '<span class="badge c5">Hết hàng</span>'))(Object.values(p.stock).reduce((a, b) => a + b, 0))}</td><td class="row"><button class="btn o s" data-a="pedit" data-p="${p.id}">Sửa</button><button class="btn d s" data-a="pdel" data-p="${p.id}">Xóa</button></td></tr>`).join('')}</table></div>`;
 }
 
 function aord() {
@@ -1149,7 +1153,7 @@ function pform(p) {
     colors: ['Đen', 'Trắng'],
     stock: {}
   };
-  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu (Đen, Trắng, Xám)</label><input id="m_l" value="${p.colors.join(',')}"></div></div>${n ? '' : stockGrid(p)}<div class="fld"><label>${n ? 'Tồn kho mỗi biến thể' : 'Tồn kho cho biến thể mới (khi thêm size/màu)'}</label><input id="m_k" type="number" min="0" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
+  return `<h3>${n ? 'Thêm' : 'Sửa'} sản phẩm</h3><div class="fld"><label>Tên</label><input id="m_n" value="${esc(p.name)}"></div><div class="f2"><div class="fld"><label>Giá (₫)</label><input id="m_p" type="number" value="${p.price}"></div><div class="fld"><label>Giá khuyến mãi (₫)</label><input id="m_s" type="number" value="${p.sale || ''}"></div></div><div class="fld"><label>Danh mục</label><select id="m_c">${CATS.map(c => `<option value="${c[0]}"${p.cat === c[0] ? ' selected' : ''}>${c[1]}</option>`).join('')}</select></div><div class="fld"><label>Mô tả</label><textarea id="m_d" rows="2">${esc(p.desc)}</textarea></div>${window.TryOn ? `<div class="fld"><label for="m_t">Thử đồ AI (dùng ảnh đầu tiên của sản phẩm)</label><select id="m_t">${[['', 'Tự động theo danh mục'], ['upper', 'Áo / phần trên'], ['lower', 'Quần, chân váy / phần dưới'], ['overall', 'Váy liền, đồ liền thân'], ['none', 'Không hỗ trợ']].map(o => `<option value="${o[0]}"${(p.tryOnType || '') === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('')}</select></div>` : ''}<div class="f2"><div class="fld"><label>Size (cách nhau dấu phẩy)</label><input id="m_z" value="${p.sizes.join(',')}"></div><div class="fld"><label>Màu (cách nhau dấu phẩy, vd: Đen, Trắng, Xanh navy)</label><input id="m_l" value="${p.colors.join(',')}"></div></div>${n ? '' : stockGrid(p)}<div class="fld"><label>${n ? 'Tồn kho mỗi biến thể' : 'Tồn kho cho biến thể mới (khi thêm size/màu)'}</label><input id="m_k" type="number" min="0" value="10"></div>${imgFld()}<div class="err" id="merr"></div><div class="row"><button class="btn" data-a="psv" data-p="${n ? 0 : p.id}">Lưu</button><button class="btn o" data-a="mclose">Hủy</button></div>`;
 }
 
 function pimgsHtml() {
@@ -1209,7 +1213,6 @@ const resetF = () => ({
   cat: '',
   sort: 'new',
   size: '',
-  color: '',
   stock: false,
   min: '',
   max: '',
@@ -1426,7 +1429,7 @@ Object.assign(A, {
     render();
   },
   reset: () => {
-    S.f = { q: '', cat: '', sort: 'new', size: '', color: '', stock: false, min: '', max: '', page: 1 };
+    S.f = { q: '', cat: '', sort: 'new', size: '', stock: false, min: '', max: '', page: 1 };
     render();
   },
   pg: p => {
@@ -1676,12 +1679,13 @@ Object.assign(A, {
       colors = g('m_l')
         .split(',')
         .map(s => s.trim())
-        .filter(c => COLS[c]);
+        .filter(Boolean)
+        .map(addColor);
     if (g('m_n').length < 2) return (er.textContent = 'Vui lòng nhập tên sản phẩm');
     if (!(price > 0)) return (er.textContent = 'Giá phải lớn hơn 0');
     if (sale && sale >= price) return (er.textContent = 'Giá khuyến mãi phải thấp hơn giá gốc');
     if (!sizes.length || !colors.length)
-      return (er.textContent = 'Cần ít nhất 1 size và 1 màu hợp lệ (Đen, Trắng, Xám)');
+      return (er.textContent = 'Cần ít nhất 1 size và 1 màu');
     const old = +p ? P(p) : null,
       edited = readStockInputs(),
       stock = {};

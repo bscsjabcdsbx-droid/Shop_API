@@ -330,3 +330,9 @@ model PasswordReset {
 
   @@index([userId])
 }
+
+// Màu hiển thị cho các ô chọn màu ở trang sản phẩm (admin chỉnh trong trang quản trị).
+model ColorSwatch {
+  name String @id
+  hex  String
+}

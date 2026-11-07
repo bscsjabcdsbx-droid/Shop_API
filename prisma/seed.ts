@@ -2,13 +2,12 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 const db = new PrismaClient();
 
-const cats = [["Áo","ao"],["Quần","quan"],["Váy","vay"],["Áo khoác","khoac"],["Phụ kiện","pk"]] as const;
+const cats = [["Áo","ao"],["Quần","quan"],["Váy","vay"],["Áo khoác","khoac"]] as const;
 const names: Record<string, string[]> = {
   ao: ["Áo thun basic","Áo sơ mi linen","Áo polo pique","Áo len cổ tròn"],
   quan: ["Quần jean slim","Quần kaki ống đứng","Quần short linen","Quần jogger nỉ"],
   vay: ["Váy midi xếp ly","Váy sơ mi dáng dài","Váy suông cotton","Chân váy chữ A"],
   khoac: ["Áo khoác bomber","Áo khoác denim","Áo blazer oversize","Áo khoác gió"],
-  pk: ["Mũ lưỡi trai","Thắt lưng da","Khăn lụa","Túi tote canvas"],
 };
 const slugify = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/đ/g,"d").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
 
@@ -41,9 +40,7 @@ async function main() {
 
       n++;
       const price = (150 + (n * 37) % 600) * 1000;
-      const sizes = slug === "pk"
-        ? ["FREE"]
-        : ["S", "M", "L", "XL"];
+      const sizes = ["S", "M", "L", "XL"];
       const colors = ["Đen", "Trắng", "Xám"].slice(
         0,
         2 + (n % 2)

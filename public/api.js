@@ -92,7 +92,7 @@
       vid[v.size + '|' + v.color] = v.id;
     });
     const sizes = [...new Set(vs.map(v => v.size))].sort((a, b) => SZ.indexOf(a) - SZ.indexOf(b));
-    const colors = [...new Set(vs.map(v => v.color))];
+    const colors = [...new Set(vs.map(v => v.color))].filter(Boolean).map(addColor);
     return {
       id: s.id,
       slug: s.slug,
@@ -188,7 +188,7 @@
       ...remainingPages.flatMap(page => page.items)
     ];
 
-    db.products = items.map(mapP);
+    db.products = items.map(mapP).filter(p => !HIDDEN_CATS.includes(p.cat));
 
     // Cập nhật ánh xạ biến thể.
     VM = {};
@@ -210,6 +210,26 @@
     console.log(`Đã tải ${items.length}/${first.total} sản phẩm.`);
   }
 
+  async function loadPalette() {
+    try {
+      const list = await rq('/colors');
+      Object.keys(PALETTE).forEach(k => delete PALETTE[k]);
+      list.forEach(c => (PALETTE[c.name] = c.hex));
+      applyPalette();
+    } catch (e) { }
+  }
+  function patchPalette() {
+    saveSwatch = async function (name, hex) {
+      await rq('/colors', { method: 'PUT', body: { name, hex } });
+      PALETTE[name] = hex;
+      COLS[name] = hex;
+    };
+    resetSwatch = async function (name) {
+      await rq('/colors/' + encodeURIComponent(name), { method: 'DELETE' });
+      delete PALETTE[name];
+      COLS[name] = colorHex(name);
+    };
+  }
   async function loadCats() {
     (await rq('/products/categories')).forEach(c => {
       CATIDS[c.slug] = c.id;
@@ -622,17 +642,16 @@
         .split(',')
         .map(s => s.trim().toUpperCase())
         .filter(Boolean);
-      const colors = [...new Set(
-        g('m_l')
-          .split(',')
-          .map(c => c.trim())
-          .filter(Boolean)
-      )];
+      const colors = g('m_l')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(addColor);
       if (g('m_n').length < 2) return (er.textContent = 'Vui lòng nhập tên sản phẩm');
       if (!(price > 0)) return (er.textContent = 'Giá phải lớn hơn 0');
       if (sale && sale >= price) return (er.textContent = 'Giá khuyến mãi phải thấp hơn giá gốc');
       if (!sizes.length || !colors.length)
-        return (er.textContent = 'Cần ít nhất 1 size và 1 màu hợp lệ (Đen, Trắng, Xám)');
+        return (er.textContent = 'Cần ít nhất 1 size và 1 màu');
       const old = +p ? P(p) : null,
         sl = slug(g('m_n'));
       const edited = readStockInputs();
@@ -930,9 +949,11 @@
     } catch (e) { }
     db = { v: 1, session: null, users: [], products: [], orders: [], carts: {}, wish, reviews: {}, coupons: [], chats: {} };
     install();
+    patchPalette();
     window.MONO_TRYON.online = true;
     if (window.TryOn) window.TryOn.loadCfg();
-    await Promise.all([loadProducts(), loadCats(), loadCols()]);
+    await Promise.all([loadPalette(), loadProducts(), loadCats(), loadCols()]);
+    applyPalette();
     if (TOKEN) {
       try {
         setUser(await rq('/auth/me'));

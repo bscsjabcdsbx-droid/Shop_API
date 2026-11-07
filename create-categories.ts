@@ -7,7 +7,6 @@ const categories = [
   { name: "Quần", slug: "quan" },
   { name: "Váy", slug: "vay" },
   { name: "Áo khoác", slug: "khoac" },
-  { name: "Phụ kiện", slug: "pk" },
 ];
 
 async function main() {

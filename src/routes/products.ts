@@ -5,6 +5,8 @@ import { db, HttpError, wrap } from "../lib.js";
 import { requireAuth, uid } from "../lib.js";
 
 const r = Router();
+// Danh mục đã gỡ khỏi cửa hàng (Phụ kiện): không trả ra ở API công khai.
+const HIDDEN_CATEGORIES = ["pk"];
 const q = z.object({
   q: z.string().optional(), category: z.string().optional(),
   minPrice: z.coerce.number().int().min(0).optional(), maxPrice: z.coerce.number().int().min(0).optional(),
@@ -25,13 +27,13 @@ function withRating<T extends { reviews: { rating: number }[]; variants: { stock
   return { ...rest, variants, rating: reviews.length ? +(reviews.reduce((s, x) => s + x.rating, 0) / reviews.length).toFixed(1) : 0, reviewCount: reviews.length, inStock: variants.some(v => v.stock > 0) };
 }
 
-r.get("/categories", wrap(async (_req, res) => res.json(await db.category.findMany({ orderBy: { id: "asc" } }))));
+r.get("/categories", wrap(async (_req, res) => res.json(await db.category.findMany({ where: { slug: { notIn: HIDDEN_CATEGORIES } }, orderBy: { id: "asc" } }))));
 
 r.get("/", wrap(async (req, res) => {
   const f = q.parse(req.query);
   const where: Prisma.ProductWhereInput = { isActive: true,
     ...(f.q && { name: { contains: f.q, mode: "insensitive" } }),
-    ...(f.category && { category: { slug: f.category } }),
+    category: { slug: f.category ? { equals: f.category, notIn: HIDDEN_CATEGORIES } : { notIn: HIDDEN_CATEGORIES } },
     ...((f.minPrice !== undefined || f.maxPrice !== undefined) && { price: { gte: f.minPrice, lte: f.maxPrice } }),
     ...((f.size || f.color || f.inStock === "true") && { variants: { some: { size: f.size, color: f.color, ...(f.inStock === "true" && { stock: { gt: 0 } }) } } }),
   };
@@ -43,7 +45,7 @@ r.get("/", wrap(async (req, res) => {
 }));
 
 r.get("/:slug", wrap(async (req, res) => {
-  const p = await db.product.findFirst({ where: { slug: req.params.slug, isActive: true }, include: {
+  const p = await db.product.findFirst({ where: { slug: req.params.slug, isActive: true, category: { slug: { notIn: HIDDEN_CATEGORIES } } }, include: {
     ...listInclude, images: { orderBy: { position: "asc" } },
     variants: { orderBy: [{ color: "asc" }, { size: "asc" }] },
     reviews: { orderBy: { createdAt: "desc" }, take: 20, include: { user: { select: { name: true } } } } } });
