@@ -8,7 +8,7 @@
   /* ---------- Cấu hình: sửa tại đây ---------- */
   const CONTACT = {
     phone: '1900 0000',
-    email: 'hello@NSHV.vn',
+    email: 'buichaunamthai128208@gmail.com',
     facebook: 'https://www.facebook.com/buichaunamthai128208', // TODO: thay bằng link fanpage thật của cửa hàng
     instagram: 'https://www.instagram.com/' // TODO: thay bằng link Instagram thật của cửa hàng
   };
