@@ -563,6 +563,47 @@ function products() {
  ${pager(page, pg)}</section></div>`;
 }
 
+function formatProductDescription(value) {
+  let text = String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+  // Tách các tiêu đề thành từng phần.
+  const headings = [
+    "Why you'll reach for it",
+    "Why you'll love it",
+    "Fabric & care",
+    "Fit & sizing",
+    "Size Guide",
+    "Size",
+    "Product measurements, laid flat, in inches.",
+    "Wear it with",
+    "Styling Suggestions",
+    "Additional Information",
+    "Thương hiệu:",
+    "Sản phẩm gốc:",
+    "Nguồn dữ liệu:"
+  ];
+
+  headings.forEach(heading => {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(
+      new RegExp(`\\s*(${escaped})\\s*`, 'gi'),
+      '\n\n$1\n'
+    );
+  });
+
+  // Tách các câu mô tả thành từng dòng dễ đọc.
+  text = text
+    .replace(/\s+(Designed with|Made from|Available in sizes:|Stretch:|Not lined\.|Sheer:)/gi, '\n• $1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return `<div class="product-description">${esc(text).replace(/\n/g, '<br>')}</div>`;
+}
+
+
 function detail() {
   const p = P(S.arg);
   if (!p) return '<div class="empty">Không tìm thấy sản phẩm.</div>';
@@ -575,7 +616,7 @@ function detail() {
     rel = db.products.filter(x => x.cat === p.cat && x.id !== p.id).slice(0, 4);
   return `<div class="det"><div><img class="big" src="${img(p, S.img)}" alt="${esc(p.name)}"><div class="th">${im.map(i => `<img src="${img(p, i)}" class="${S.img === i ? 'on' : ''}" data-a="gi" data-p="${i}" alt="Ảnh ${i + 1}">`).join('')}</div></div>
  <div><span class="mut">${CATS.find(c => c[0] === p.cat)[1]}</span><h1>${esc(p.name)}</h1><div class="st">${stars(rate(p))} <span class="mut">${rate(p).toFixed(1)} (${rv.length} đánh giá)</span></div>
- <p class="pr"><b style="font-size:24px">${vnd(pp(p))}</b>${p.sale ? `<s>${vnd(p.price)}</s> <span class="badge">-${Math.round(100 - (p.sale / p.price) * 100)}%</span>` : ''}</p><p class="mut">${esc(p.desc)}</p>
+ <p class="pr"><b style="font-size:24px">${vnd(pp(p))}</b>${p.sale ? `<s>${vnd(p.price)}</s> <span class="badge">-${Math.round(100 - (p.sale / p.price) * 100)}%</span>` : ''}</p>${formatProductDescription(p.desc)}
  <b>Màu sắc</b><div class="row" style="margin:6px 0 14px">${p.colors.map(c => `<button class="sw${s.color === c ? ' on' : ''}" style="background:${COLS[c]}" data-a="sel" data-p="color:${c}" aria-label="${c}" title="${c}"></button>`).join('')}</div>
  <b>Size</b><div class="chips" style="margin:6px 0 14px">${p.sizes
       .map(z => {
