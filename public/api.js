@@ -75,6 +75,7 @@
         x ? `Dữ liệu không hợp lệ (${(x.path || []).join('.')}): ${x.message}` : (d && d.error) || 'Lỗi ' + r.status
       );
       e.status = r.status;
+      e.data = d; // dữ liệu lỗi đầy đủ từ server (vd: danh sách sản phẩm chặn việc xóa màu)
       throw e;
     }
     return d;
@@ -229,8 +230,10 @@
       delete PALETTE[name];
       COLS[name] = colorHex(name);
     };
-    purgeColor = async function (name) {
-      await rq('/colors/' + encodeURIComponent(name) + '/products', { method: 'DELETE' });
+    // replaceWith (tùy chọn): các sản phẩm chỉ có đúng màu này sẽ được chuyển sang màu thay thế thay vì bị chặn.
+    purgeColor = async function (name, replaceWith) {
+      const qs = replaceWith ? '?replaceWith=' + encodeURIComponent(replaceWith) : '';
+      await rq('/colors/' + encodeURIComponent(name) + '/products' + qs, { method: 'DELETE' });
       delete PALETTE[name];
       delete COLS[name];
       await reloadProducts();
@@ -305,7 +308,8 @@
         S.stats = await rq('/admin/stats');
         loadBkPending().catch(() => { });
         db.orders = (await rq('/admin/orders')).map(mapO);
-      } else if (S.adm === 'aprod') {
+      } else if (S.adm === 'aprod' || S.adm === 'acolor') {
+        // Tab Màu sắc cũng cần cả sản phẩm đang ẩn: màu chỉ có ở sản phẩm ẩn vẫn chặn việc xóa màu.
         db.products = (await rq('/admin/products')).map(mapP);
         ADMIN_P = true;
       } else if (S.adm === 'aord') db.orders = (await rq('/admin/orders')).map(mapO);
@@ -338,7 +342,7 @@
   }
   /* Tải lại danh sách sản phẩm: trong tab Sản phẩm của admin thì lấy cả sản phẩm đang ẩn */
   async function reloadProducts() {
-    if (ADMIN_P && S.view === 'admin' && S.adm === 'aprod') {
+    if (ADMIN_P && S.view === 'admin' && (S.adm === 'aprod' || S.adm === 'acolor')) {
       db.products = (await rq('/admin/products')).map(mapP);
     } else await loadProducts();
   }
@@ -749,7 +753,7 @@
       S.adm = p;
       S.aq = '';
       S.as = '';
-      S.ap = 1;
+      // Không đặt lại S.ap: mỗi mục quản trị nhớ số trang riêng, quay lại vẫn đúng trang cũ.
       S.open = null;
       render();
       loadAdmin();
