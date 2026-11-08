@@ -749,6 +749,7 @@
       S.adm = p;
       S.aq = '';
       S.as = '';
+      S.ap = 1;
       S.open = null;
       render();
       loadAdmin();

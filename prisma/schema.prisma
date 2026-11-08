@@ -1,43 +1,30 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  CUSTOMER
-  ADMIN
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  PREPARING
-  SHIPPING
-  DELIVERED
-  CANCELLED
-}
-
 model User {
-  id           Int        @id @default(autoincrement())
-  email        String     @unique
-  passwordHash String
-  name         String
-  phone        String?
-  role         Role       @default(CUSTOMER)
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  cart         Cart?
-  addresses    Address[]
-  orders       Order[]
-  reviews      Review[]
-  wishlist     Wishlist[]
-  chatMessages ChatMessage[]
-  tryOnJobs    TryOnJob[]
-  bookings     Booking[]
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  passwordHash   String
+  name           String
+  phone          String?
+  role           Role            @default(CUSTOMER)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  addresses      Address[]
+  bookings       Booking[]
+  cart           Cart?
+  chatMessages   ChatMessage[]
+  orders         Order[]
   passwordResets PasswordReset[]
+  reviews        Review[]
+  tryOnJobs      TryOnJob[]
+  wishlist       Wishlist[]
 }
 
 model Category {
@@ -60,14 +47,14 @@ model Product {
   isActive    Boolean          @default(true)
   createdAt   DateTime         @default(now())
   categoryId  Int
+  tryOnType   String?
   category    Category         @relation(fields: [categoryId], references: [id])
   images      ProductImage[]
   variants    ProductVariant[]
   reviews     Review[]
-  wishlist    Wishlist[]
-  // Loại trang phục khi thử đồ AI: upper | lower | overall | none. null = tự suy theo danh mục.
-  tryOnType   String?
   tryOnJobs   TryOnJob[]
+  wishlist    Wishlist[]
+
   @@index([categoryId])
 }
 
@@ -85,9 +72,10 @@ model ProductVariant {
   color      String
   stock      Int         @default(0)
   productId  Int
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems  CartItem[]
   orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@unique([productId, size, color])
 }
 
@@ -105,6 +93,7 @@ model CartItem {
   variantId Int
   cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
   variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
   @@unique([cartId, variantId])
 }
 
@@ -137,11 +126,12 @@ model Order {
   userId        Int
   user          User        @relation(fields: [userId], references: [id])
   items         OrderItem[]
+
   @@index([userId])
 }
 
 model OrderItem {
-  id        Int            @id @default(autoincrement())
+  id        Int             @id @default(autoincrement())
   name      String
   size      String
   color     String
@@ -149,8 +139,8 @@ model OrderItem {
   quantity  Int
   orderId   Int
   variantId Int?
-  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
 }
 
 model Review {
@@ -160,8 +150,9 @@ model Review {
   createdAt DateTime @default(now())
   userId    Int
   productId Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, productId])
   @@index([productId, createdAt])
 }
@@ -170,8 +161,9 @@ model Wishlist {
   id        Int     @id @default(autoincrement())
   userId    Int
   productId Int
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, productId])
 }
 
@@ -187,16 +179,16 @@ model CollectionImage {
 }
 
 model Collection {
-  id           Int      @id @default(autoincrement())
+  id           Int               @id @default(autoincrement())
   title        String
   categorySlug String
   imageUrl     String?
-  isActive     Boolean  @default(true)
-  position     Int      @default(0)
-  createdAt    DateTime @default(now())
+  isActive     Boolean           @default(true)
+  position     Int               @default(0)
+  createdAt    DateTime          @default(now())
+  images       CollectionImage[]
 
   @@index([isActive, position])
-  images       CollectionImage[]
 }
 
 model Upload {
@@ -206,26 +198,21 @@ model Upload {
   createdAt DateTime @default(now())
 }
 
-enum CouponType {
-  PERCENT
-  FIXED
-}
-
 model Coupon {
-  id           Int        @id @default(autoincrement())
-  code         String     @unique
-  description  String     @default("")
+  id           Int         @id @default(autoincrement())
+  code         String      @unique
+  description  String      @default("")
   type         CouponType
   value        Int
-  minOrder     Int        @default(0)
+  minOrder     Int         @default(0)
   maxDiscount  Int?
   usageLimit   Int?
   perUserLimit Int?
-  usedCount    Int        @default(0)
+  usedCount    Int         @default(0)
   startsAt     DateTime?
   expiresAt    DateTime?
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
   uses         CouponUse[]
 }
 
@@ -254,16 +241,6 @@ model ChatMessage {
   @@index([userId, id])
 }
 
-// ===== Thử đồ AI (CatVTON) =====
-// Chỉ lưu metadata. Ảnh người dùng và ảnh kết quả KHÔNG BAO GIỜ được lưu vào database.
-enum TryOnStatus {
-  QUEUED
-  PROCESSING
-  COMPLETED
-  FAILED
-  CANCELLED
-}
-
 model TryOnJob {
   id                String      @id @default(uuid())
   userId            Int
@@ -271,7 +248,6 @@ model TryOnJob {
   garmentType       String
   status            TryOnStatus @default(QUEUED)
   idempotencyKey    String
-  // false khi lỗi do hệ thống (máy AI tắt, hàng đợi đầy...) -> không trừ lượt của người dùng
   countsTowardQuota Boolean     @default(true)
   errorCode         String?
   queuePosition     Int?
@@ -282,19 +258,12 @@ model TryOnJob {
   resultReleased    Boolean     @default(false)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
   @@index([status, createdAt])
-}
-
-// ===== Đặt lịch gặp stylist =====
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
 }
 
 model Booking {
@@ -305,7 +274,6 @@ model Booking {
   mode        String
   topic       String
   note        String?
-  // Ngày hẹn dạng "YYYY-MM-DD" và giờ hẹn dạng "HH:mm" (giờ Việt Nam, 08:00–22:00)
   date        String
   time        String
   status      BookingStatus @default(PENDING)
@@ -318,7 +286,6 @@ model Booking {
   @@index([status])
 }
 
-// ===== Quên mật khẩu: chỉ lưu mã băm (SHA-256) của token, token dùng 1 lần, hết hạn sau 30 phút =====
 model PasswordReset {
   id        Int       @id @default(autoincrement())
   userId    Int
@@ -331,8 +298,40 @@ model PasswordReset {
   @@index([userId])
 }
 
-// Màu hiển thị cho các ô chọn màu ở trang sản phẩm (admin chỉnh trong trang quản trị).
 model ColorSwatch {
   name String @id
   hex  String
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPING
+  DELIVERED
+  CANCELLED
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum TryOnStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }

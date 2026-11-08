@@ -35,7 +35,10 @@ r.delete("/:name/products", requireAuth, requireAdmin, wrap(async (req, res) => 
     const others = await db.productVariant.count({ where: { productId: pid, NOT: { color: name } } });
     if (!others) blocked.push(variants.find(v => v.productId === pid)!.product.name);
   }
-  if (blocked.length) throw new HttpError(409, `Không thể xóa: "${name}" là màu duy nhất của ${blocked.join(", ")}. Hãy thêm màu khác cho sản phẩm trước.`);
+  if (blocked.length) {
+    const shown = blocked.slice(0, 5).join(", ") + (blocked.length > 5 ? ` và ${blocked.length - 5} sản phẩm khác` : "");
+    throw new HttpError(409, `Không thể xóa: "${name}" là màu duy nhất của ${shown}. Hãy thêm màu khác cho các sản phẩm này trước.`);
+  }
   const [removed] = await db.$transaction([
     db.productVariant.deleteMany({ where: { color: name } }),
     db.colorSwatch.deleteMany({ where: { name } }),
